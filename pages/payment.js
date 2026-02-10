@@ -135,7 +135,7 @@ export default function Payment() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: url('/images/iiskills-main-hero.jpg');
+          background: url('/images/iiskills-main-hero1.jpg');
           background-size: cover;
           background-position: center;
           color: white;
@@ -152,12 +152,14 @@ export default function Payment() {
           font-size: 3rem;
           margin-bottom: 1rem;
           font-weight: 700;
+          color: #667eea;
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .hero p {
           font-size: 1.3rem;
           opacity: 0.95;
+          color: #667eea;
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 

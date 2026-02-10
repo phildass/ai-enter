@@ -10,7 +10,7 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: url('/images/aienter-rm90-hero.jpg');
+          background: url('/images/iiskills-aienter-hero2.jpg');
           background-size: cover;
           background-position: center;
           color: white;
