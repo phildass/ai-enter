@@ -1,0 +1,30 @@
+{
+  "name": "ai-enter",
+  "version": "1.0.0",
+  "description": "ai enterprises for smart SaaS solutions AI Cloud Enterprises.html",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phildass/ai-enter.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/phildass/ai-enter/issues"
+  },
+  "homepage": "https://github.com/phildass/ai-enter#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
+    "next": "^15.0.8",
+    "razorpay": "^2.9.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
