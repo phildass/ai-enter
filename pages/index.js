@@ -1,25 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
-
-// Get random images excluding hero images
-function getRandomImages(count = 3) {
-  const allImages = [
-    'aienter-rm2.jpg',
-    'aienter-rm3.jpg',
-    'aienter-rm4.jpg',
-    'aienter-rm5.jpg',
-    'aienter-rm7.jpg',
-    'aienter-rm8.jpg',
-    'aienter-rm9.jpg',
-    'aienter-rm10.jpg',
-    'aienter-rm11.jpg'
-  ];
-  
-  // Shuffle and pick random images
-  const shuffled = [...allImages].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-}
+import { getRandomImages } from '../lib/utils';
 
 export default function Home() {
   const [featureImages, setFeatureImages] = useState([]);

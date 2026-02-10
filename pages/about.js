@@ -1,23 +1,7 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import Link from 'next/link';
-
-function getRandomImages(count = 2) {
-  const allImages = [
-    'aienter-rm2.jpg',
-    'aienter-rm3.jpg',
-    'aienter-rm4.jpg',
-    'aienter-rm5.jpg',
-    'aienter-rm7.jpg',
-    'aienter-rm8.jpg',
-    'aienter-rm9.jpg',
-    'aienter-rm10.jpg',
-    'aienter-rm11.jpg'
-  ];
-  
-  const shuffled = [...allImages].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-}
+import { getRandomImages } from '../lib/utils';
 
 export default function About() {
   const [images, setImages] = useState([]);
