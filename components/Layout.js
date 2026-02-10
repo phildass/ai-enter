@@ -74,6 +74,7 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           list-style: none;
           display: flex;
           gap: 1.5rem;
+          align-items: center;
         }
         
         nav :global(a) {

@@ -101,31 +101,6 @@ export default function About() {
           font-size: 1rem;
         }
 
-        .cta-section {
-          background: #f8f9ff;
-          padding: 3rem;
-          border-radius: 15px;
-          text-align: center;
-          margin-top: 3rem;
-        }
-
-        .cta-button {
-          display: inline-block;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 1.2rem 3rem;
-          border-radius: 50px;
-          font-weight: bold;
-          font-size: 1.2rem;
-          transition: all 0.3s ease;
-          margin-top: 1rem;
-        }
-
-        .cta-button:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-
         @media (max-width: 768px) {
           .content-grid {
             grid-template-columns: 1fr;
@@ -217,13 +192,6 @@ export default function About() {
           </div>
         </div>
 
-        <div className="cta-section">
-          <h2>Ready to Join Us?</h2>
-          <p>Start your journey towards a successful career in AI and cloud technologies today.</p>
-          <Link href="/payment" className="cta-button">
-            Explore Our Courses
-          </Link>
-        </div>
       </div>
     </Layout>
   );

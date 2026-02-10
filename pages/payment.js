@@ -129,21 +129,36 @@ export default function Payment() {
   return (
     <Layout title="Payment - AI Cloud Enterprises">
       <style jsx>{`
-        .payment-hero {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        .hero {
+          position: relative;
+          min-height: 400px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: url('/images/aienter-rm90-hero.jpg');
+          background-size: cover;
+          background-position: center;
           color: white;
-          padding: 3rem 2rem;
           text-align: center;
+          padding: 4rem 2rem;
         }
 
-        .payment-hero h1 {
-          font-size: 2.5rem;
-          margin-bottom: 0.5rem;
+        .hero-content {
+          max-width: 900px;
+          z-index: 1;
         }
 
-        .payment-hero p {
-          font-size: 1.2rem;
+        .hero h1 {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          font-weight: 700;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero p {
+          font-size: 1.3rem;
           opacity: 0.95;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .container {
@@ -283,8 +298,12 @@ export default function Payment() {
         }
 
         @media (max-width: 768px) {
-          .payment-hero h1 {
-            font-size: 2rem;
+          .hero h1 {
+            font-size: 2.5rem;
+          }
+
+          .hero p {
+            font-size: 1.2rem;
           }
 
           .payment-card {
@@ -293,9 +312,11 @@ export default function Payment() {
         }
       `}</style>
 
-      <div className="payment-hero">
-        <h1>Complete Your Enrollment</h1>
-        <p>Secure payment powered by Razorpay</p>
+      <div className="hero">
+        <div className="hero-content">
+          <h1>Complete Your Enrollment</h1>
+          <p>Secure payment powered by Razorpay</p>
+        </div>
       </div>
 
       <div className="container">

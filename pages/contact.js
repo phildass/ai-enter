@@ -56,46 +56,24 @@ export default function Contact() {
           padding: 0 2rem;
         }
 
-        .contact-grid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 4rem;
-        }
-
         .contact-info {
           background: white;
-          padding: 3rem;
+          padding: 2rem;
           border-radius: 15px;
           box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+          text-align: center;
+          margin-bottom: 2rem;
         }
 
         .contact-info h2 {
           color: #667eea;
-          margin-bottom: 2rem;
-          font-size: 2rem;
+          margin-bottom: 1rem;
+          font-size: 1.5rem;
         }
 
-        .info-item {
-          display: flex;
-          align-items: flex-start;
-          margin-bottom: 2rem;
-          gap: 1rem;
-        }
-
-        .info-icon {
-          font-size: 2rem;
-          min-width: 40px;
-        }
-
-        .info-content h3 {
-          color: #333;
-          margin-bottom: 0.5rem;
-          font-size: 1.3rem;
-        }
-
-        .info-content p {
+        .contact-info p {
           color: #666;
-          line-height: 1.6;
+          font-size: 1.1rem;
         }
 
         .contact-form {
@@ -171,27 +149,7 @@ export default function Contact() {
           font-weight: 600;
         }
 
-        .map-section {
-          margin-top: 4rem;
-          background: white;
-          padding: 3rem;
-          border-radius: 15px;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-        }
-
-        .map-section h2 {
-          color: #667eea;
-          margin-bottom: 2rem;
-          text-align: center;
-          font-size: 2rem;
-        }
-
         @media (max-width: 768px) {
-          .contact-grid {
-            grid-template-columns: 1fr;
-            gap: 2rem;
-          }
-
           .contact-hero h1 {
             font-size: 2.5rem;
           }
@@ -204,51 +162,13 @@ export default function Contact() {
       </div>
 
       <div className="container">
-        <div className="contact-grid">
-          <div className="contact-info">
-            <h2>Contact Information</h2>
-            
-            <div className="info-item">
-              <div className="info-icon">📍</div>
-              <div className="info-content">
-                <h3>Address</h3>
-                <p>AI Cloud Enterprises<br />
-                Tech Park, Innovation Hub<br />
-                Bangalore, Karnataka 560001<br />
-                India</p>
-              </div>
-            </div>
+        <div className="contact-info">
+          <h2>Contact Email</h2>
+          <p>support@aienter.in</p>
+        </div>
 
-            <div className="info-item">
-              <div className="info-icon">📞</div>
-              <div className="info-content">
-                <h3>Phone</h3>
-                <p>+91 (800) 123-4567<br />
-                Mon-Fri: 9:00 AM - 6:00 PM IST</p>
-              </div>
-            </div>
-
-            <div className="info-item">
-              <div className="info-icon">✉️</div>
-              <div className="info-content">
-                <h3>Email</h3>
-                <p>info@aienter.com<br />
-                support@aienter.com</p>
-              </div>
-            </div>
-
-            <div className="info-item">
-              <div className="info-icon">🌐</div>
-              <div className="info-content">
-                <h3>Follow Us</h3>
-                <p>LinkedIn | Twitter | Facebook<br />
-                @aicloudenterprises</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="contact-form">
-            <h2>Send Us a Message</h2>
+        <div className="contact-form">
+          <h2>Contact Us</h2>
             
             {submitted && (
               <div className="success-message">
@@ -309,25 +229,6 @@ export default function Contact() {
 
               <button type="submit">Send Message</button>
             </form>
-          </div>
-        </div>
-
-        <div className="map-section">
-          <h2>Visit Our Campus</h2>
-          <p style={{ textAlign: 'center', color: '#666', marginBottom: '2rem' }}>
-            Come visit us at our state-of-the-art training facility in Bangalore
-          </p>
-          <div style={{ 
-            background: '#f0f0f0', 
-            height: '400px', 
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#999'
-          }}>
-            <p>Map placeholder - Integrate with Google Maps API</p>
-          </div>
         </div>
       </div>
     </Layout>
