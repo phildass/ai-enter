@@ -53,8 +53,7 @@ export default async function handler(req, res) {
               course_id: courseId,
               razorpay_order_id: razorpay_order_id,
               razorpay_payment_id: razorpay_payment_id,
-              payment_status: 'completed',
-              created_at: new Date().toISOString()
+              payment_status: 'completed'
             }
           ]);
 

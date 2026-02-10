@@ -97,8 +97,7 @@ export default function Payments() {
               const verifyData = await verifyResponse.json();
 
               if (verifyResponse.ok && verifyData.success) {
-                // Payment successful
-                alert('Payment successful! You are now enrolled in ' + course.name);
+                // Payment successful - redirect to success page
                 router.push('/success?course=' + selectedCourse);
               } else {
                 throw new Error(verifyData.error || 'Payment verification failed');
