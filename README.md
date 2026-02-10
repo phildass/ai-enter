@@ -1,19 +1,20 @@
 # AI Cloud Enterprises
 
-Modern, elegant platform for AI and cloud technology education with integrated course enrollment and payments.
+Modern, elegant corporate platform for AI Cloud Enterprises offering premium courses in AI, PR, Management, Professional Skills, Government Jobs, and Software Development with integrated course enrollment and payments.
 
 ## Overview
 
-This is a Next.js-based platform offering premium courses in AI, Machine Learning, Cloud Computing, Full Stack Development, and Data Science. Features a modern, elegant design with integrated Razorpay payment gateway and Supabase database for tracking enrollments.
+This is a Next.js-based platform offering six specialized courses designed to empower professional careers. Features a modern, corporate design with integrated Razorpay payment gateway and Supabase database for tracking enrollments.
 
 ## Features
 
-- 🎨 Modern, elegant UI with hero sections and responsive design
-- 🏠 Complete site with Home, About, Contact, Enroll, and Payment pages
-- 📚 Unified pricing for all courses (Early Bird: ₹116.82, Regular: ₹352.82)
+- 🎨 Modern, corporate UI with elegant design and responsive layout
+- 🏠 Complete site with Home, Solutions, About, Contact, Payment, Privacy Policy, and Terms & Conditions pages
+- 📚 Six specialized courses with unified pricing
+- 🎁 Special combo offer: Learn AI + Learn Developer at Learn AI price
 - 💳 Secure payment processing with Razorpay
 - 📊 Enrollment tracking in Supabase database
-- 🎯 Streamlined enrollment and payment flow
+- 🎯 Streamlined payment flow with course selection
 - ✅ Server-side payment verification
 - 📱 Fully responsive design
 - 🖼️ Dynamic image integration from public assets
@@ -45,26 +46,31 @@ This is a Next.js-based platform offering premium courses in AI, Machine Learnin
 
 ## Site Structure
 
-- **Home (/)** - Hero section with AI Cloud logo, feature highlights, and stats
+- **Home (/)** - Hero section with AI Cloud Enterprises branding, feature highlights, and stats
+- **Solutions (/solutions)** - Overview of all six courses and their benefits
 - **About (/about)** - Mission, approach, and core values
 - **Contact (/contact)** - Contact information and message form
-- **Enroll (/enroll)** - Course catalog with unified pricing
-- **Payment (/payment)** - Secure payment form with Razorpay integration
+- **Payment (/payment)** - Secure payment form with course selection and Razorpay integration
+- **Privacy Policy (/privacy)** - Privacy policy and data handling practices
+- **Terms & Conditions (/terms)** - Terms of service and refund policy
 - **Success (/success)** - Enrollment confirmation page
 
 ## Pricing
 
 All courses have the same fee structure:
 
-- **Early Bird (Till Feb 28, 2026):** ₹99 + 18% GST = ₹116.82
-- **Regular (From March 1, 2026):** ₹299 + 18% GST = ₹352.82
+- **Early Bird (Till Feb 28, 2026):** ₹99 + 18% GST (₹17.82) = ₹116.82 total
+- **Regular (From March 1, 2026):** ₹299 + 18% GST (₹53.82) = ₹352.82 total
 
 ## Available Courses
 
-1. AI & Machine Learning Fundamentals
-2. Cloud Computing Essentials
-3. Full Stack Development
-4. Data Science & Analytics
+1. **Learn AI** - Master artificial intelligence and machine learning
+2. **Learn PR** - Master public relations and corporate communications
+3. **Learn Management** - Develop essential leadership and management skills
+4. **Learn Finesse** - Master professional etiquette and interpersonal skills
+5. **Learn Govt Jobs** - Comprehensive government job exam preparation
+6. **Learn Developer** - Build professional software development skills
+7. **Learn AI + Learn Developer** (Combo) - Both courses at the price of Learn AI!
 
 ## Documentation
 

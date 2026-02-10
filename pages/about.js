@@ -11,7 +11,7 @@ export default function About() {
   }, []);
 
   return (
-    <Layout title="About Us - AI Enter">
+    <Layout title="About Us - AI Cloud Enterprises">
       <style jsx>{`
         .about-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -220,7 +220,7 @@ export default function About() {
         <div className="cta-section">
           <h2>Ready to Join Us?</h2>
           <p>Start your journey towards a successful career in AI and cloud technologies today.</p>
-          <Link href="/enroll" className="cta-button">
+          <Link href="/payment" className="cta-button">
             Explore Our Courses
           </Link>
         </div>
