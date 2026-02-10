@@ -127,7 +127,7 @@ export default function Payment() {
   };
 
   return (
-    <Layout title="Payment - AI Enter">
+    <Layout title="Payment - AI Cloud Enterprises">
       <style jsx>{`
         .payment-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

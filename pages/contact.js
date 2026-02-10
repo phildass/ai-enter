@@ -31,7 +31,7 @@ export default function Contact() {
   };
 
   return (
-    <Layout title="Contact Us - AI Enter">
+    <Layout title="Contact Us - AI Cloud Enterprises">
       <style jsx>{`
         .contact-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

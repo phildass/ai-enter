@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 
-export default function Layout({ children, title = 'AI Enter - Smart SaaS Solutions' }) {
+export default function Layout({ children, title = 'AI Cloud Enterprises - Smart SaaS Solutions' }) {
   return (
     <>
       <Head>
@@ -31,8 +31,8 @@ export default function Layout({ children, title = 'AI Enter - Smart SaaS Soluti
 
       <style jsx>{`
         header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background: white;
+          color: #333;
           padding: 1rem 0;
           box-shadow: 0 2px 10px rgba(0,0,0,0.1);
           position: sticky;
@@ -53,36 +53,41 @@ export default function Layout({ children, title = 'AI Enter - Smart SaaS Soluti
           display: flex;
           align-items: center;
           gap: 1rem;
+          background: white;
+          padding: 0.5rem;
+          border-radius: 5px;
         }
 
         .logo-image {
-          height: 40px;
+          height: 50px;
           width: auto;
         }
         
         nav h1 {
-          font-size: 1.8rem;
+          font-size: 1.5rem;
           cursor: pointer;
+          color: #667eea;
+          font-weight: 600;
         }
         
         nav ul {
           list-style: none;
           display: flex;
-          gap: 2rem;
+          gap: 1.5rem;
         }
         
         nav :global(a) {
-          color: white;
+          color: #333;
           text-decoration: none;
           font-weight: 500;
-          transition: opacity 0.3s;
+          transition: all 0.3s;
           padding: 0.5rem 1rem;
           border-radius: 5px;
         }
         
         nav :global(a:hover) {
-          opacity: 0.8;
-          background: rgba(255, 255, 255, 0.1);
+          color: #667eea;
+          background: rgba(102, 126, 234, 0.1);
         }
         
         footer {
@@ -111,16 +116,18 @@ export default function Layout({ children, title = 'AI Enter - Smart SaaS Soluti
         <nav>
           <Link href="/">
             <div className="logo-container">
-              <img src="/images/ai-cloud.png" alt="AI Cloud" className="logo-image" />
-              <h1>AI Enter</h1>
+              <img src="/images/ai-cloud.png" alt="AI Cloud Enterprises" className="logo-image" />
+              <h1>AI Cloud Enterprises</h1>
             </div>
           </Link>
           <ul>
             <li><Link href="/">Home</Link></li>
+            <li><Link href="/solutions">Solutions</Link></li>
             <li><Link href="/about">About</Link></li>
             <li><Link href="/contact">Contact</Link></li>
-            <li><Link href="/enroll">Enroll</Link></li>
             <li><Link href="/payment">Payment</Link></li>
+            <li><Link href="/privacy">Privacy Policy</Link></li>
+            <li><Link href="/terms">Terms & Conditions</Link></li>
           </ul>
         </nav>
       </header>

@@ -9,7 +9,7 @@ export default function Success() {
   const course = courseId ? getCourseById(courseId) : null;
 
   return (
-    <Layout title="Payment Successful - AI Enter">
+    <Layout title="Payment Successful - AI Cloud Enterprises">
       <style jsx>{`
         .container {
           max-width: 700px;
@@ -174,7 +174,7 @@ export default function Success() {
           </div>
           
           <div className="button-group">
-            <Link href="/enroll" className="btn secondary-button">
+            <Link href="/payment" className="btn secondary-button">
               Browse Courses
             </Link>
             <Link href="/" className="btn primary-button">

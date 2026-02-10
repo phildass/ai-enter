@@ -11,7 +11,7 @@ export default function Home() {
   }, []);
 
   return (
-    <Layout title="AI Enter - Smart SaaS Solutions">
+    <Layout title="AI Cloud Enterprises - Transform Your Future with AI">
       <style jsx>{`
         .hero {
           position: relative;
@@ -19,8 +19,8 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%),
-                      url('/images/ai-cloud.png');
+          background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%),
+                      url('/images/aienter-rm90-hero.jpg');
           background-size: cover;
           background-position: center;
           color: white;
@@ -192,21 +192,21 @@ export default function Home() {
 
       <div className="hero">
         <div className="hero-content">
-          <h1>Transform Your Future with AI</h1>
-          <p>Empowering businesses and individuals with cutting-edge AI and cloud technologies</p>
+          <h1>AI Cloud Enterprises</h1>
+          <p>Empowering professionals with cutting-edge AI and cloud technologies for career excellence</p>
           <div className="cta-buttons">
-            <Link href="/enroll" className="cta-button cta-primary">
+            <Link href="/payment" className="cta-button cta-primary">
               Enroll Now
             </Link>
-            <Link href="/about" className="cta-button cta-secondary">
-              Learn More
+            <Link href="/solutions" className="cta-button cta-secondary">
+              View Solutions
             </Link>
           </div>
         </div>
       </div>
 
       <div className="container">
-        <h2 className="section-title">Why Choose AI Enter?</h2>
+        <h2 className="section-title">Why Choose AI Cloud Enterprises?</h2>
         <div className="features">
           <div className="feature-card">
             {featureImages[0] && (
@@ -259,7 +259,7 @@ export default function Home() {
       <div className="container">
         <h2 className="section-title">Ready to Start Your Journey?</h2>
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-          <Link href="/enroll" className="cta-button cta-primary">
+          <Link href="/payment" className="cta-button cta-primary">
             View Our Courses
           </Link>
         </div>
