@@ -129,6 +129,38 @@ export default function Payment() {
   return (
     <Layout title="Payment - AI Cloud Enterprises">
       <style jsx>{`
+        .hero {
+          position: relative;
+          min-height: 400px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: url('/images/aienter-rm90-hero.jpg');
+          background-size: cover;
+          background-position: center;
+          color: white;
+          text-align: center;
+          padding: 4rem 2rem;
+        }
+
+        .hero-content {
+          max-width: 900px;
+          z-index: 1;
+        }
+
+        .hero h1 {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          font-weight: 700;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero p {
+          font-size: 1.3rem;
+          opacity: 0.95;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
         .payment-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
@@ -283,6 +315,14 @@ export default function Payment() {
         }
 
         @media (max-width: 768px) {
+          .hero h1 {
+            font-size: 2.5rem;
+          }
+
+          .hero p {
+            font-size: 1.2rem;
+          }
+
           .payment-hero h1 {
             font-size: 2rem;
           }
@@ -293,9 +333,14 @@ export default function Payment() {
         }
       `}</style>
 
+      <div className="hero">
+        <div className="hero-content">
+          <h1>Complete Your Enrollment</h1>
+          <p>Secure payment powered by Razorpay</p>
+        </div>
+      </div>
+
       <div className="payment-hero">
-        <h1>Complete Your Enrollment</h1>
-        <p>Secure payment powered by Razorpay</p>
       </div>
 
       <div className="container">
