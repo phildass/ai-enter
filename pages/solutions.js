@@ -1,81 +1,26 @@
-import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import Link from 'next/link';
-import { getRandomImages } from '../lib/utils';
 
 export default function Solutions() {
-  const [solutionImages, setSolutionImages] = useState([]);
-
-  useEffect(() => {
-    setSolutionImages(getRandomImages(6));
-  }, []);
-
   const solutions = [
     {
-      title: 'Learn AI',
-      description: 'Master artificial intelligence and machine learning to transform your career in the AI era.',
-      icon: '🤖',
-      benefits: [
-        'AI fundamentals and applications',
-        'Machine learning techniques',
-        'Real-world AI projects',
-        'Industry-recognized certification'
-      ]
+      title: 'Sector Focus',
+      description: 'From healthcare to education, our apps are precisely tailored to address the unique challenges of each industry. We empower organizations to thrive in the digital era—delivering seamless, effective solutions for businesses of every sector.',
+      icon: '🎯',
     },
     {
-      title: 'Learn PR',
-      description: 'Master public relations and corporate communications for the digital age.',
-      icon: '📢',
-      benefits: [
-        'Strategic PR planning',
-        'Media relations expertise',
-        'Crisis management',
-        'Digital communication strategies'
-      ]
+      title: 'Scalable Solutions',
+      description: 'Our subscription-based platforms grow with your business, ensuring seamless digital experiences for both mass and niche audiences.',
+      icon: '📈',
     },
     {
-      title: 'Learn Management',
-      description: 'Develop essential leadership and management skills for modern organizations.',
-      icon: '👔',
-      benefits: [
-        'Strategic management principles',
-        'Team leadership',
-        'Project management',
-        'Decision-making frameworks'
-      ]
+      title: 'Mobile Apps',
+      description: 'Smart mobile solutions that bring India's digital future right to your fingertips.',
+      icon: '📱',
     },
     {
-      title: 'Learn Finesse',
-      description: 'Master professional etiquette and interpersonal skills for career success.',
-      icon: '✨',
-      benefits: [
-        'Professional communication',
-        'Business etiquette',
-        'Networking excellence',
-        'Personal branding'
-      ]
-    },
-    {
-      title: 'Learn Govt Jobs',
-      description: 'Comprehensive preparation for government job examinations and interviews.',
-      icon: '🏛️',
-      benefits: [
-        'Exam preparation strategies',
-        'Mock tests and assessments',
-        'Interview preparation',
-        'Current affairs mastery'
-      ]
-    },
-    {
-      title: 'Learn Developer',
-      description: 'Build professional software development skills from fundamentals to advanced.',
+      title: 'Web Apps',
+      description: 'Robust, scalable web applications designed for broad and niche audiences alike.',
       icon: '💻',
-      benefits: [
-        'Full-stack development',
-        'Modern frameworks',
-        'Best practices',
-        'Portfolio projects'
-      ]
     }
   ];
 
@@ -83,21 +28,23 @@ export default function Solutions() {
     <Layout title="Solutions - AI Cloud Enterprises">
       <style jsx>{`
         .solutions-hero {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
+          background: white;
+          color: #333;
           padding: 4rem 2rem;
           text-align: center;
+          border-bottom: 2px solid #f0f0f0;
         }
 
         .solutions-hero h1 {
           font-size: 3rem;
           margin-bottom: 1rem;
           font-weight: 700;
+          color: #667eea;
         }
 
         .solutions-hero p {
           font-size: 1.3rem;
-          opacity: 0.95;
+          color: #666;
           max-width: 800px;
           margin: 0 auto;
         }
@@ -129,7 +76,7 @@ export default function Solutions() {
 
         .solutions-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
           gap: 2.5rem;
           margin-top: 3rem;
         }
@@ -140,6 +87,8 @@ export default function Solutions() {
           overflow: hidden;
           box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
           transition: all 0.3s ease;
+          padding: 2.5rem;
+          text-align: center;
         }
 
         .solution-card:hover {
@@ -147,114 +96,21 @@ export default function Solutions() {
           box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         }
 
-        .solution-image {
-          width: 100%;
-          height: 200px;
-          object-fit: cover;
-        }
-
-        .solution-header {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 2rem;
-          text-align: center;
-        }
-
         .solution-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-        }
-
-        .solution-header h3 {
-          font-size: 1.8rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .solution-body {
-          padding: 2rem;
-        }
-
-        .solution-body p {
-          color: #666;
-          line-height: 1.8;
+          font-size: 4rem;
           margin-bottom: 1.5rem;
         }
 
-        .benefits-list {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-        }
-
-        .benefits-list li {
-          padding: 0.7rem 0;
-          color: #666;
-          display: flex;
-          align-items: center;
-        }
-
-        .benefits-list li:before {
-          content: "✓";
+        .solution-card h3 {
           color: #667eea;
-          font-weight: bold;
-          margin-right: 0.8rem;
-          font-size: 1.2rem;
-        }
-
-        .cta-section {
-          background: #f8f9ff;
-          padding: 4rem 2rem;
-          margin-top: 4rem;
-          border-radius: 15px;
-          text-align: center;
-        }
-
-        .cta-section h2 {
-          color: #667eea;
-          font-size: 2.5rem;
+          font-size: 1.8rem;
           margin-bottom: 1rem;
         }
 
-        .cta-section p {
-          font-size: 1.2rem;
+        .solution-card p {
           color: #666;
-          margin-bottom: 2rem;
-        }
-
-        .special-offer {
-          background: white;
-          padding: 2rem;
-          border-radius: 10px;
-          margin: 2rem auto;
-          max-width: 600px;
-          border: 2px solid #667eea;
-        }
-
-        .special-offer h3 {
-          color: #667eea;
-          margin-bottom: 1rem;
-        }
-
-        .special-offer p {
-          color: #666;
-          margin: 0;
-        }
-
-        .cta-button {
-          display: inline-block;
-          padding: 1.2rem 3rem;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          border-radius: 50px;
-          font-weight: bold;
-          font-size: 1.2rem;
-          text-decoration: none;
-          transition: all 0.3s ease;
-        }
-
-        .cta-button:hover {
-          transform: translateY(-3px);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+          line-height: 1.8;
+          font-size: 1.1rem;
         }
 
         @media (max-width: 768px) {
@@ -274,60 +130,27 @@ export default function Solutions() {
 
       <div className="solutions-hero">
         <h1>Our Solutions</h1>
-        <p>Comprehensive courses designed to empower your career and transform your professional journey</p>
+        <p>Comprehensive SaaS-based solutions designed to empower your business and transform your digital journey</p>
       </div>
 
       <div className="container">
         <div className="intro-section">
-          <h2>Choose Your Path to Success</h2>
+          <h2>Corporate Solutions for Every Industry</h2>
           <p>
-            AI Cloud Enterprises offers six specialized courses, each designed to provide you with industry-relevant 
-            skills and knowledge. Whether you're looking to enter the AI field, advance in management, prepare for 
-            government jobs, or master professional skills, we have the perfect solution for you.
+            AI Cloud Enterprises delivers cutting-edge SaaS solutions for businesses across India. 
+            Our platforms are designed to scale with your organization, providing robust tools for 
+            education, automation, and digital transformation.
           </p>
         </div>
 
         <div className="solutions-grid">
           {solutions.map((solution, index) => (
             <div key={index} className="solution-card">
-              {solutionImages[index] && (
-                <img 
-                  src={`/images/${solutionImages[index]}`} 
-                  alt={solution.title} 
-                  className="solution-image" 
-                />
-              )}
-              <div className="solution-header">
-                <div className="solution-icon">{solution.icon}</div>
-                <h3>{solution.title}</h3>
-              </div>
-              <div className="solution-body">
-                <p>{solution.description}</p>
-                <ul className="benefits-list">
-                  {solution.benefits.map((benefit, idx) => (
-                    <li key={idx}>{benefit}</li>
-                  ))}
-                </ul>
-              </div>
+              <div className="solution-icon">{solution.icon}</div>
+              <h3>{solution.title}</h3>
+              <p>{solution.description}</p>
             </div>
           ))}
-        </div>
-
-        <div className="cta-section">
-          <h2>Ready to Get Started?</h2>
-          <p>All courses are available at the same affordable price</p>
-          
-          <div className="special-offer">
-            <h3>🎁 Special Combo Offer!</h3>
-            <p>
-              <strong>Learn AI + Learn Developer</strong> bundle available at the same price as Learn AI alone. 
-              Get double the value with our exclusive combo offer!
-            </p>
-          </div>
-
-          <Link href="/payment" className="cta-button">
-            Enroll Now
-          </Link>
         </div>
       </div>
     </Layout>
