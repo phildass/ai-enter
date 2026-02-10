@@ -14,7 +14,7 @@ export default function Solutions() {
     },
     {
       title: 'Mobile Apps',
-      description: 'Smart mobile solutions that bring India's digital future right to your fingertips.',
+      description: 'Smart mobile solutions that bring India\'s digital future right to your fingertips.',
       icon: '📱',
     },
     {
