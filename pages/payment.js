@@ -161,23 +161,6 @@ export default function Payment() {
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 
-        .payment-hero {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 3rem 2rem;
-          text-align: center;
-        }
-
-        .payment-hero h1 {
-          font-size: 2.5rem;
-          margin-bottom: 0.5rem;
-        }
-
-        .payment-hero p {
-          font-size: 1.2rem;
-          opacity: 0.95;
-        }
-
         .container {
           max-width: 700px;
           margin: 4rem auto;
@@ -323,10 +306,6 @@ export default function Payment() {
             font-size: 1.2rem;
           }
 
-          .payment-hero h1 {
-            font-size: 2rem;
-          }
-
           .payment-card {
             padding: 2rem;
           }
@@ -338,9 +317,6 @@ export default function Payment() {
           <h1>Complete Your Enrollment</h1>
           <p>Secure payment powered by Razorpay</p>
         </div>
-      </div>
-
-      <div className="payment-hero">
       </div>
 
       <div className="container">
