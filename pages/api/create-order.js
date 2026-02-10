@@ -1,5 +1,5 @@
 import Razorpay from 'razorpay';
-import { getCourseById } from '../../lib/courses';
+import { getCourseById, getCurrentFee } from '../../lib/courses';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -26,6 +26,9 @@ export default async function handler(req, res) {
       });
     }
 
+    // Get current fee (same for all courses)
+    const feeInfo = getCurrentFee();
+
     // Initialize Razorpay
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
@@ -34,14 +37,17 @@ export default async function handler(req, res) {
 
     // Create order
     const options = {
-      amount: course.price, // amount in paise
-      currency: course.currency,
+      amount: feeInfo.total, // amount in paise
+      currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
         courseId: courseId,
         courseName: course.name,
         customerName: customerName,
-        customerPhone: customerPhone
+        customerPhone: customerPhone,
+        basePrice: feeInfo.displayBase,
+        gst: feeInfo.displayGst,
+        total: feeInfo.displayTotal
       }
     };
 
@@ -51,7 +57,8 @@ export default async function handler(req, res) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID
+      keyId: process.env.RAZORPAY_KEY_ID,
+      feeInfo: feeInfo
     });
   } catch (error) {
     console.error('Error creating order:', error);

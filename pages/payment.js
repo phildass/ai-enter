@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
+import Layout from '../components/Layout';
 import { useRouter } from 'next/router';
-import { courses, getCourseById } from '../lib/courses';
+import { courses, getCourseById, getCurrentFee } from '../lib/courses';
 
-export default function Payments() {
+export default function Payment() {
   const router = useRouter();
   const { course: courseParam } = router.query;
   
@@ -12,6 +12,11 @@ export default function Payments() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [feeInfo, setFeeInfo] = useState(null);
+
+  useEffect(() => {
+    setFeeInfo(getCurrentFee());
+  }, []);
 
   useEffect(() => {
     if (courseParam && !selectedCourse) {
@@ -44,8 +49,6 @@ export default function Payments() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           courseId: selectedCourse,
-          amount: course.price,
-          currency: course.currency,
           customerName: name,
           customerPhone: phone
         })
@@ -68,7 +71,7 @@ export default function Payments() {
           key: orderData.keyId,
           amount: orderData.amount,
           currency: orderData.currency,
-          name: 'AI Enter',
+          name: 'AI Cloud Enterprises',
           description: course.name,
           order_id: orderData.orderId,
           prefill: {
@@ -124,85 +127,74 @@ export default function Payments() {
   };
 
   return (
-    <>
-      <Head>
-        <title>Payments - AI Enter</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      </Head>
-
-      <style jsx global>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        
-        body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-          line-height: 1.6;
-          color: #333;
-          background: #f5f5f5;
-        }
-      `}</style>
-
+    <Layout title="Payment - AI Enter">
       <style jsx>{`
-        header {
+        .payment-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 1rem 0;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          padding: 3rem 2rem;
+          text-align: center;
         }
-        
-        nav {
-          max-width: 1200px;
-          margin: 0 auto;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0 2rem;
+
+        .payment-hero h1 {
+          font-size: 2.5rem;
+          margin-bottom: 0.5rem;
         }
-        
-        nav h1 {
-          font-size: 1.8rem;
+
+        .payment-hero p {
+          font-size: 1.2rem;
+          opacity: 0.95;
         }
-        
-        nav ul {
-          list-style: none;
-          display: flex;
-          gap: 2rem;
-        }
-        
-        nav a {
-          color: white;
-          text-decoration: none;
-          font-weight: 500;
-          transition: opacity 0.3s;
-        }
-        
-        nav a:hover {
-          opacity: 0.8;
-        }
-        
+
         .container {
-          max-width: 600px;
+          max-width: 700px;
           margin: 4rem auto;
           padding: 0 2rem;
         }
         
         .payment-card {
           background: white;
-          border-radius: 10px;
+          border-radius: 15px;
           padding: 3rem;
-          box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
         }
-        
-        h2 {
-          color: #667eea;
+
+        .pricing-info {
+          background: #f8f9ff;
+          padding: 2rem;
+          border-radius: 10px;
           margin-bottom: 2rem;
-          text-align: center;
-          font-size: 2rem;
+          border-left: 4px solid #667eea;
         }
-        
+
+        .pricing-info h3 {
+          color: #667eea;
+          margin-bottom: 1rem;
+          font-size: 1.5rem;
+        }
+
+        .price-breakdown {
+          margin: 1rem 0;
+        }
+
+        .price-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.5rem 0;
+          color: #555;
+        }
+
+        .price-total {
+          display: flex;
+          justify-content: space-between;
+          padding: 1rem 0;
+          margin-top: 1rem;
+          border-top: 2px solid #667eea;
+          font-weight: bold;
+          font-size: 1.3rem;
+          color: #667eea;
+        }
+
         .form-group {
           margin-bottom: 1.5rem;
         }
@@ -210,15 +202,15 @@ export default function Payments() {
         label {
           display: block;
           margin-bottom: 0.5rem;
-          font-weight: 500;
+          font-weight: 600;
           color: #555;
         }
         
         input, select {
           width: 100%;
-          padding: 0.8rem;
+          padding: 1rem;
           border: 1px solid #ddd;
-          border-radius: 5px;
+          border-radius: 8px;
           font-size: 1rem;
           transition: border-color 0.3s;
         }
@@ -232,17 +224,18 @@ export default function Payments() {
           width: 100%;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 1rem;
+          padding: 1.2rem;
           border: none;
-          border-radius: 5px;
+          border-radius: 8px;
           font-size: 1.1rem;
           font-weight: bold;
           cursor: pointer;
-          transition: opacity 0.3s;
+          transition: all 0.3s ease;
         }
         
         button:hover:not(:disabled) {
-          opacity: 0.9;
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
         }
         
         button:disabled {
@@ -254,7 +247,7 @@ export default function Payments() {
           background: #fee;
           color: #c33;
           padding: 1rem;
-          border-radius: 5px;
+          border-radius: 8px;
           margin-bottom: 1rem;
           border: 1px solid #fcc;
         }
@@ -262,7 +255,7 @@ export default function Payments() {
         .course-info {
           background: #f8f9ff;
           padding: 1.5rem;
-          border-radius: 5px;
+          border-radius: 8px;
           margin-bottom: 2rem;
           border-left: 4px solid #667eea;
         }
@@ -270,40 +263,64 @@ export default function Payments() {
         .course-info h3 {
           color: #667eea;
           margin-bottom: 0.5rem;
+          font-size: 1.3rem;
         }
-        
-        .price-display {
-          font-size: 1.8rem;
-          font-weight: bold;
-          color: #667eea;
-          margin-top: 0.5rem;
+
+        .course-info p {
+          color: #666;
+          margin: 0;
         }
-        
-        footer {
-          background: #333;
-          color: white;
+
+        .secure-badge {
           text-align: center;
-          padding: 2rem;
-          margin-top: 4rem;
+          margin-top: 1.5rem;
+          color: #666;
+          font-size: 0.9rem;
+        }
+
+        .secure-badge::before {
+          content: "🔒 ";
+        }
+
+        @media (max-width: 768px) {
+          .payment-hero h1 {
+            font-size: 2rem;
+          }
+
+          .payment-card {
+            padding: 2rem;
+          }
         }
       `}</style>
 
-      <header>
-        <nav>
-          <h1>AI Enter</h1>
-          <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/courses.html">Courses</a></li>
-            <li><a href="/payments">Payments</a></li>
-          </ul>
-        </nav>
-      </header>
+      <div className="payment-hero">
+        <h1>Complete Your Enrollment</h1>
+        <p>Secure payment powered by Razorpay</p>
+      </div>
 
       <div className="container">
         <div className="payment-card">
-          <h2>Enroll in a Course</h2>
-          
           {error && <div className="error">{error}</div>}
+          
+          {feeInfo && (
+            <div className="pricing-info">
+              <h3>{feeInfo.period}</h3>
+              <div className="price-breakdown">
+                <div className="price-row">
+                  <span>Base Price:</span>
+                  <span>₹{feeInfo.displayBase}</span>
+                </div>
+                <div className="price-row">
+                  <span>GST (18%):</span>
+                  <span>₹{feeInfo.displayGst}</span>
+                </div>
+              </div>
+              <div className="price-total">
+                <span>Total Amount:</span>
+                <span>₹{feeInfo.displayTotal}</span>
+              </div>
+            </div>
+          )}
           
           <form onSubmit={handleSubmit}>
             <div className="form-group">
@@ -317,7 +334,7 @@ export default function Payments() {
                 <option value="">Choose a course...</option>
                 {courses.map(course => (
                   <option key={course.id} value={course.id}>
-                    {course.name} - ₹{(course.price / 100).toFixed(2)}
+                    {course.name}
                   </option>
                 ))}
               </select>
@@ -327,9 +344,6 @@ export default function Payments() {
               <div className="course-info">
                 <h3>{getCourseById(selectedCourse).name}</h3>
                 <p>{getCourseById(selectedCourse).description}</p>
-                <div className="price-display">
-                  ₹{(getCourseById(selectedCourse).price / 100).toFixed(2)}
-                </div>
               </div>
             )}
             
@@ -352,22 +366,22 @@ export default function Payments() {
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Enter your phone number"
+                placeholder="Enter your 10-digit phone number"
                 pattern="[0-9]{10,}"
                 required
               />
             </div>
             
             <button type="submit" disabled={loading}>
-              {loading ? 'Processing...' : 'Proceed to Payment'}
+              {loading ? 'Processing...' : `Pay ₹${feeInfo?.displayTotal || '...'}`}
             </button>
+
+            <div className="secure-badge">
+              Secure payment processing
+            </div>
           </form>
         </div>
       </div>
-
-      <footer>
-        <p>&copy; 2026 AI Enter. All rights reserved.</p>
-      </footer>
-    </>
+    </Layout>
   );
 }
