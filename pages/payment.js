@@ -135,7 +135,7 @@ export default function Payment() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: url('/images/aienter-rm90-hero.jpg');
+          background: url('/images/iiskills-main-hero.jpg');
           background-size: cover;
           background-position: center;
           color: white;
