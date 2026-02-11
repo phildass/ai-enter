@@ -9,7 +9,6 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="AI Cloud Enterprises - Smart SaaS Solutions for the Future" />
         <link rel="icon" type="image/png" href="/images/aienter-favicon.png" />
-        <link rel="shortcut icon" type="image/png" href="/images/aienter-favicon.png" />
         <link rel="apple-touch-icon" href="/images/aienter-favicon.png" />
       </Head>
 
