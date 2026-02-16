@@ -74,7 +74,8 @@ All courses have the same fee structure:
 
 ## Documentation
 
-For detailed setup instructions, see [SETUP.md](SETUP.md)
+- **Development Setup:** See [SETUP.md](SETUP.md) for local development instructions
+- **Production Deployment:** See [DEPLOYMENT.md](DEPLOYMENT.md) for server deployment guide
 
 ## License
 
