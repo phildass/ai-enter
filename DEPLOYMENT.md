@@ -205,10 +205,10 @@ curl -I http://localhost:3040
 sudo systemctl status nginx
 
 # Check Nginx access logs
-sudo tail -f /var/nginx/access.log
+sudo tail -f /var/log/nginx/access.log
 
 # Check Nginx error logs
-sudo tail -f /var/nginx/error.log
+sudo tail -f /var/log/nginx/error.log
 ```
 
 ### 4. Test Domain Access
@@ -355,7 +355,7 @@ For deployment issues:
 
 1. Check this guide's troubleshooting section
 2. Review PM2 logs: `pm2 logs aienter`
-3. Review Nginx logs: `sudo tail -f /var/nginx/error.log`
+3. Review Nginx logs: `sudo tail -f /var/log/nginx/error.log`
 4. Verify all environment variables are set correctly
 5. Ensure server has adequate resources (RAM, disk space)
 
