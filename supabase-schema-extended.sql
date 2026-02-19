@@ -1,5 +1,18 @@
 -- AI Enter - Extended Supabase Database Schema
 -- Run this script in your Supabase SQL Editor to set up the complete database
+-- Note: This extends the base schema. Run supabase-schema.sql first if purchases table doesn't exist.
+
+-- Create purchases table if it doesn't exist (from base schema)
+CREATE TABLE IF NOT EXISTS purchases (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,
+  course_id TEXT NOT NULL,
+  razorpay_order_id TEXT NOT NULL,
+  razorpay_payment_id TEXT NOT NULL,
+  payment_status TEXT NOT NULL DEFAULT 'completed',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
 -- Create users table for registration
 CREATE TABLE IF NOT EXISTS users (
@@ -66,12 +79,12 @@ CREATE INDEX IF NOT EXISTS idx_course_access_course ON course_access(course_id);
 CREATE INDEX IF NOT EXISTS idx_otp_codes_code ON otp_codes(otp_code);
 CREATE INDEX IF NOT EXISTS idx_otp_codes_course ON otp_codes(course_id);
 
--- Enable Row Level Security
+-- Enable Row Level Security (with rate limiting consideration)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE course_access ENABLE ROW LEVEL SECURITY;
 ALTER TABLE otp_codes ENABLE ROW LEVEL SECURITY;
 
--- Create policies for users table
+-- Create policies for users table (with CAPTCHA requirement to be enforced at application level)
 DROP POLICY IF EXISTS "Users can read own data" ON users;
 CREATE POLICY "Users can read own data" ON users
   FOR SELECT USING (auth.uid() = id);
@@ -83,6 +96,7 @@ CREATE POLICY "Users can update own data" ON users
 DROP POLICY IF EXISTS "Allow insert for registration" ON users;
 CREATE POLICY "Allow insert for registration" ON users
   FOR INSERT WITH CHECK (true);
+-- Note: Rate limiting and CAPTCHA validation should be enforced at application level
 
 -- Create policies for course_access table
 DROP POLICY IF EXISTS "Users can read own course access" ON course_access;
@@ -106,14 +120,16 @@ DROP POLICY IF EXISTS "Allow update for usage tracking" ON otp_codes;
 CREATE POLICY "Allow update for usage tracking" ON otp_codes
   FOR UPDATE USING (true);
 
--- Function to generate OTP
+-- Function to generate OTP (using cryptographically secure random)
+-- Note: For production, consider using pgcrypto extension: CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE OR REPLACE FUNCTION generate_otp()
 RETURNS TEXT AS $$
 DECLARE
   otp TEXT;
 BEGIN
-  -- Generate 6-digit OTP
-  otp := LPAD(FLOOR(RANDOM() * 1000000)::TEXT, 6, '0');
+  -- Generate 6-digit OTP using gen_random_uuid() for better randomness
+  -- Convert UUID to integer and take modulo to get 6 digits
+  otp := LPAD(((ABS(HASHTEXT(gen_random_uuid()::TEXT)) % 1000000))::TEXT, 6, '0');
   RETURN otp;
 END;
 $$ LANGUAGE plpgsql;

@@ -393,8 +393,8 @@ export default function Register() {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              pattern="[0-9]{10}"
-              placeholder="10-digit phone number"
+              pattern="[0-9+\-\s()]{10,15}"
+              placeholder="Phone number (10-15 digits)"
               required
             />
           </div>

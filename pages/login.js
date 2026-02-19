@@ -312,7 +312,7 @@ export default function Login() {
             type="button"
             className="magic-link-btn"
             onClick={handleMagicLink}
-            disabled={loading || !formData.email}
+            disabled={loading || !formData.email || !/\S+@\S+\.\S+/.test(formData.email)}
           >
             Send Magic Link
           </button>
