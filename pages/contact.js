@@ -36,122 +36,170 @@ export default function Contact() {
         .contact-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 4rem 2rem;
+          padding: 6rem 2rem;
           text-align: center;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .contact-hero::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="2" fill="white" opacity="0.1"/></svg>');
+          opacity: 0.3;
         }
 
         .contact-hero h1 {
-          font-size: 3rem;
-          margin-bottom: 1rem;
+          font-size: 3.5rem;
+          margin-bottom: 1.5rem;
+          font-weight: 800;
+          position: relative;
+          z-index: 1;
+          letter-spacing: -1px;
         }
 
         .contact-hero p {
-          font-size: 1.3rem;
+          font-size: 1.4rem;
           opacity: 0.95;
+          position: relative;
+          z-index: 1;
+          font-weight: 500;
         }
 
         .container {
-          max-width: 1200px;
-          margin: 4rem auto;
+          max-width: 900px;
+          margin: 5rem auto;
           padding: 0 2rem;
         }
 
         .contact-info {
           background: white;
-          padding: 2rem;
-          border-radius: 15px;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+          padding: 3rem;
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
           text-align: center;
-          margin-bottom: 2rem;
+          margin-bottom: 3rem;
+          border: 1px solid rgba(102, 126, 234, 0.1);
         }
 
         .contact-info h2 {
           color: #667eea;
-          margin-bottom: 1rem;
-          font-size: 1.5rem;
+          margin-bottom: 1.5rem;
+          font-size: 1.8rem;
+          font-weight: 700;
         }
 
         .contact-info p {
           color: #666;
-          font-size: 1.1rem;
+          font-size: 1.2rem;
+          font-weight: 500;
         }
 
         .contact-form {
           background: white;
-          padding: 3rem;
-          border-radius: 15px;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+          padding: 4rem;
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+          border: 1px solid rgba(102, 126, 234, 0.1);
         }
 
         .contact-form h2 {
           color: #667eea;
-          margin-bottom: 2rem;
-          font-size: 2rem;
+          margin-bottom: 2.5rem;
+          font-size: 2.2rem;
+          font-weight: 800;
+          text-align: center;
         }
 
         .form-group {
-          margin-bottom: 1.5rem;
+          margin-bottom: 2rem;
         }
 
         label {
           display: block;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.7rem;
           font-weight: 600;
           color: #555;
+          font-size: 1rem;
         }
 
         input, textarea {
           width: 100%;
-          padding: 1rem;
-          border: 1px solid #ddd;
-          border-radius: 8px;
+          padding: 1.2rem;
+          border: 2px solid #e8e8e8;
+          border-radius: 12px;
           font-size: 1rem;
           font-family: inherit;
-          transition: border-color 0.3s;
+          transition: all 0.3s ease;
+          background: #f8f9ff;
         }
 
         input:focus, textarea:focus {
           outline: none;
           border-color: #667eea;
+          background: white;
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
         }
 
         textarea {
           resize: vertical;
-          min-height: 150px;
+          min-height: 180px;
         }
 
         button {
           width: 100%;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 1.2rem;
+          padding: 1.3rem;
           border: none;
-          border-radius: 8px;
-          font-size: 1.1rem;
-          font-weight: bold;
+          border-radius: 12px;
+          font-size: 1.15rem;
+          font-weight: 700;
           cursor: pointer;
           transition: all 0.3s ease;
+          box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
 
         button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+          transform: translateY(-3px);
+          box-shadow: 0 12px 35px rgba(102, 126, 234, 0.5);
         }
 
         .success-message {
-          background: #d4edda;
+          background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
           color: #155724;
-          padding: 1rem;
-          border-radius: 8px;
-          margin-bottom: 1rem;
-          border: 1px solid #c3e6cb;
+          padding: 1.5rem;
+          border-radius: 12px;
+          margin-bottom: 2rem;
+          border: 2px solid #b1dfbb;
           text-align: center;
           font-weight: 600;
+          font-size: 1.05rem;
         }
 
         @media (max-width: 768px) {
+          .contact-hero {
+            padding: 4rem 1.5rem;
+          }
+
           .contact-hero h1 {
             font-size: 2.5rem;
+          }
+
+          .contact-hero p {
+            font-size: 1.2rem;
+          }
+
+          .contact-form {
+            padding: 2.5rem 2rem;
+          }
+
+          .contact-info {
+            padding: 2rem;
           }
         }
       `}</style>
@@ -168,11 +216,11 @@ export default function Contact() {
         </div>
 
         <div className="contact-form">
-          <h2>Contact Us</h2>
+          <h2>Send Us a Message</h2>
             
             {submitted && (
               <div className="success-message">
-                Thank you! Your message has been sent successfully.
+                ✓ Thank you! Your message has been sent successfully.
               </div>
             )}
 
