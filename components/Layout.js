@@ -149,10 +149,11 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           </Link>
           <ul>
             <li><Link href="/">Home</Link></li>
-            <li><Link href="/solutions">Solutions</Link></li>
             <li><Link href="/about">About</Link></li>
             <li><Link href="/contact">Contact</Link></li>
             <li><Link href="/payment">Payment</Link></li>
+            <li><Link href="/register">Register</Link></li>
+            <li><Link href="/login">Login</Link></li>
             <li><Link href="/privacy">Privacy Policy</Link></li>
             <li><Link href="/terms">Terms & Conditions</Link></li>
           </ul>
