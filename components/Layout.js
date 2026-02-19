@@ -10,6 +10,9 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
         <meta name="description" content="AI Cloud Enterprises - Smart SaaS Solutions for the Future" />
         <link rel="icon" type="image/png" href="/images/aienter-favicon.png" />
         <link rel="apple-touch-icon" href="/images/aienter-favicon.png" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
 
       <style jsx global>{`
@@ -20,10 +23,10 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
         }
         
         body {
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
           line-height: 1.6;
           color: #333;
-          background: #f5f5f5;
+          background: #f8f9ff;
         }
 
         a {
@@ -36,19 +39,20 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           background: white;
           color: #333;
           padding: 1rem 0;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 20px rgba(0,0,0,0.08);
           position: sticky;
           top: 0;
           z-index: 1000;
+          border-bottom: 1px solid rgba(102, 126, 234, 0.1);
         }
         
         nav {
-          max-width: 1200px;
+          max-width: 1400px;
           margin: 0 auto;
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0 2rem;
+          padding: 0 3rem;
         }
         
         .logo-container {
@@ -57,7 +61,12 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           gap: 1rem;
           background: white;
           padding: 0.5rem;
-          border-radius: 5px;
+          border-radius: 8px;
+          transition: transform 0.3s ease;
+        }
+
+        .logo-container:hover {
+          transform: translateY(-2px);
         }
 
         .logo-image {
@@ -69,48 +78,63 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           font-size: 1.5rem;
           cursor: pointer;
           color: #667eea;
-          font-weight: 600;
+          font-weight: 700;
+          letter-spacing: -0.5px;
         }
         
         nav ul {
           list-style: none;
           display: flex;
-          gap: 1.5rem;
+          gap: 0.5rem;
           align-items: center;
         }
         
         nav :global(a) {
-          color: #333;
+          color: #555;
           text-decoration: none;
           font-weight: 500;
-          transition: all 0.3s;
-          padding: 0.5rem 1rem;
-          border-radius: 5px;
+          transition: all 0.3s ease;
+          padding: 0.7rem 1.2rem;
+          border-radius: 8px;
+          font-size: 0.95rem;
         }
         
         nav :global(a:hover) {
           color: #667eea;
           background: rgba(102, 126, 234, 0.1);
+          transform: translateY(-2px);
         }
         
         footer {
-          background: #333;
+          background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
           color: white;
           text-align: center;
-          padding: 2rem;
-          margin-top: 4rem;
+          padding: 3rem 2rem;
+          margin-top: 6rem;
+          border-top: 4px solid #667eea;
+        }
+
+        footer p {
+          opacity: 0.9;
+          font-size: 0.95rem;
         }
 
         @media (max-width: 768px) {
           nav {
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
+            padding: 1rem 1.5rem;
           }
 
           nav ul {
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 0.5rem;
             justify-content: center;
+          }
+
+          nav :global(a) {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
           }
         }
       `}</style>
