@@ -14,24 +14,18 @@
 module.exports = {
   apps: [
     {
-      name: 'aienter',
-      script: 'npm',
-      args: 'start',
-      cwd: '/var/www/ai-enter',
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '1G',
+      name: "aienter",
+      cwd: "/var/www/ai-enter", // Directory of your Next.js app
+      script: "npm",
+      args: "start",
       env: {
-        NODE_ENV: 'production',
-        PORT: 3040
-      },
-      error_file: '/var/www/ai-enter/logs/pm2-error.log',
-      out_file: '/var/www/ai-enter/logs/pm2-out.log',
-      log_file: '/var/www/ai-enter/logs/pm2-combined.log',
-      time: true,
-      merge_logs: true,
-      log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
+        NODE_ENV: "production",
+        PORT: 3040,               // Next.js port (must match what your server expects)
+        // ---- Add your app's required environment variables below ----
+        // DATABASE_URL: "your_database_url_here",
+        // API_KEY: "your_api_key_here",
+        // Any other env vars your app needs
+      }
     }
   ]
 };
