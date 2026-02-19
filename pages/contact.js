@@ -219,8 +219,8 @@ export default function Contact() {
           <h2>Send Us a Message</h2>
             
             {submitted && (
-              <div className="success-message">
-                ✓ Thank you! Your message has been sent successfully.
+              <div className="success-message" role="alert">
+                <span aria-label="Success">✓</span> Thank you! Your message has been sent successfully.
               </div>
             )}
 

@@ -358,21 +358,21 @@ export default function Home() {
 
         <div className="section">
           <h2 className="section-title">Our Impact</h2>
-          <div className="value-props">
-            <div className="value-card">
-              <div className="value-number">10K+</div>
+          <div className="value-props" role="list">
+            <div className="value-card" role="listitem">
+              <div className="value-number" aria-label="Over 10,000">10K+</div>
               <div className="value-label">Students Enrolled</div>
             </div>
-            <div className="value-card">
-              <div className="value-number">50+</div>
+            <div className="value-card" role="listitem">
+              <div className="value-number" aria-label="Over 50">50+</div>
               <div className="value-label">Corporate Clients</div>
             </div>
-            <div className="value-card">
-              <div className="value-number">100%</div>
+            <div className="value-card" role="listitem">
+              <div className="value-number" aria-label="100 percent">100%</div>
               <div className="value-label">Satisfaction Rate</div>
             </div>
-            <div className="value-card">
-              <div className="value-number">24/7</div>
+            <div className="value-card" role="listitem">
+              <div className="value-number" aria-label="24 hours, 7 days a week">24/7</div>
               <div className="value-label">Support Available</div>
             </div>
           </div>

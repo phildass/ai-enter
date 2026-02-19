@@ -11,7 +11,7 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
         <link rel="icon" type="image/png" href="/images/aienter-favicon.png" />
         <link rel="apple-touch-icon" href="/images/aienter-favicon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="true" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       </Head>
 
