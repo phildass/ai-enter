@@ -16,102 +16,178 @@ export default function About() {
         .about-hero {
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white;
-          padding: 4rem 2rem;
+          padding: 6rem 2rem;
           text-align: center;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .about-hero::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: url('data:image/svg+xml,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="2" fill="white" opacity="0.1"/></svg>');
+          opacity: 0.3;
         }
 
         .about-hero h1 {
-          font-size: 3rem;
-          margin-bottom: 1rem;
+          font-size: 3.5rem;
+          margin-bottom: 1.5rem;
+          font-weight: 800;
+          position: relative;
+          z-index: 1;
+          letter-spacing: -1px;
         }
 
         .about-hero p {
-          font-size: 1.3rem;
+          font-size: 1.4rem;
           max-width: 800px;
           margin: 0 auto;
           opacity: 0.95;
+          position: relative;
+          z-index: 1;
+          font-weight: 500;
         }
 
         .container {
-          max-width: 1200px;
+          max-width: 1300px;
           margin: 0 auto;
-          padding: 4rem 2rem;
+          padding: 5rem 2rem;
         }
 
         .content-section {
-          margin-bottom: 4rem;
+          margin-bottom: 5rem;
         }
 
         .content-grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 3rem;
+          gap: 4rem;
           align-items: center;
-          margin-top: 2rem;
+          margin-top: 3rem;
+          background: white;
+          border-radius: 25px;
+          padding: 3rem;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
         }
 
         .content-image {
           width: 100%;
-          height: 400px;
+          height: 450px;
           object-fit: cover;
-          border-radius: 15px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+          border-radius: 20px;
+          box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
         }
 
         h2 {
-          font-size: 2.5rem;
+          font-size: 2.8rem;
           color: #667eea;
           margin-bottom: 1.5rem;
+          font-weight: 800;
+          letter-spacing: -0.5px;
         }
 
         p {
-          font-size: 1.1rem;
-          line-height: 1.8;
+          font-size: 1.15rem;
+          line-height: 1.9;
           color: #555;
           margin-bottom: 1.5rem;
         }
 
+        .values-section {
+          text-align: center;
+          margin-top: 5rem;
+        }
+
         .values-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 2rem;
-          margin-top: 2rem;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 2.5rem;
+          margin-top: 3rem;
         }
 
         .value-card {
           background: white;
-          padding: 2rem;
-          border-radius: 10px;
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+          padding: 3rem 2rem;
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
           text-align: center;
+          transition: all 0.4s ease;
+          border: 1px solid rgba(102, 126, 234, 0.1);
+          position: relative;
+          overflow: hidden;
+        }
+
+        .value-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 4px;
+          background: linear-gradient(90deg, #667eea, #764ba2);
+          transform: scaleX(0);
+          transition: transform 0.4s ease;
+        }
+
+        .value-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 20px 50px rgba(102, 126, 234, 0.2);
+        }
+
+        .value-card:hover::before {
+          transform: scaleX(1);
         }
 
         .value-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
+          font-size: 3.5rem;
+          margin-bottom: 1.5rem;
         }
 
         .value-card h3 {
           color: #667eea;
           margin-bottom: 1rem;
-          font-size: 1.5rem;
+          font-size: 1.6rem;
+          font-weight: 700;
         }
 
         .value-card p {
-          font-size: 1rem;
+          font-size: 1.05rem;
+          color: #666;
         }
 
         @media (max-width: 768px) {
           .content-grid {
             grid-template-columns: 1fr;
+            gap: 2rem;
+            padding: 2rem;
+          }
+
+          .about-hero {
+            padding: 4rem 1.5rem;
           }
 
           .about-hero h1 {
             font-size: 2.5rem;
           }
 
+          .about-hero p {
+            font-size: 1.2rem;
+          }
+
           h2 {
-            font-size: 2rem;
+            font-size: 2.2rem;
+          }
+
+          .content-image {
+            height: 300px;
+          }
+
+          .value-card {
+            padding: 2rem 1.5rem;
           }
         }
       `}</style>
@@ -166,8 +242,8 @@ export default function About() {
           </div>
         </div>
 
-        <div className="content-section">
-          <h2 style={{ textAlign: 'center' }}>Our Core Values</h2>
+        <div className="values-section">
+          <h2>Our Core Values</h2>
           <div className="values-grid">
             <div className="value-card">
               <div className="value-icon">🎯</div>
