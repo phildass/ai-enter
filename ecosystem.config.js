@@ -15,17 +15,25 @@ module.exports = {
   apps: [
     {
       name: "aienter",
-      cwd: "/var/www/ai-enter", // Directory of your Next.js app
+      cwd: "/var/www/ai-enter",
       script: "npm",
       args: "start",
+      interpreter: "none",
       env: {
         NODE_ENV: "production",
-        PORT: 3040,               // Next.js port (must match what your server expects)
-        // ---- Add your app's required environment variables below ----
-        // DATABASE_URL: "your_database_url_here",
-        // API_KEY: "your_api_key_here",
-        // Any other env vars your app needs
-      }
+        PORT: 3040
+      },
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "2G",
+      min_uptime: "10s",           // Don't restart if crashes within 10s
+      max_restarts: 5,              // Max 5 restarts in a window
+      restart_delay: 4000,          // Wait 4s before restarting
+      error_file: "/var/www/ai-enter/logs/aienter-error.log",
+      out_file: "/var/www/ai-enter/logs/aienter-out.log",
+      log_file: "/var/www/ai-enter/logs/aienter-combined.log",
+      time: true
     }
   ]
 };
