@@ -26,7 +26,7 @@ export default function Home() {
           display: flex;
           align-items: center;
           justify-content: center;
-          background: url('/images/iiskills-aiente.hero2.jpg');
+          background: url('/images/aienter_hero5.jpg');
           background-size: cover;
           background-position: center;
           color: white;
