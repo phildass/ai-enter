@@ -68,6 +68,8 @@ export default function Home() {
           opacity: 0.95;
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
 
+
+
           font-weight: 800;
           text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
           line-height: 1.2;
@@ -122,6 +124,8 @@ export default function Home() {
           transform: translateY(-3px);
           background: white;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+
+
 
         }
 
@@ -435,6 +439,7 @@ export default function Home() {
           </p>
 
 
+
       <div className="quote-section">
         <p className="quote">"Education is a right, not a luxury. No barriers. Just Mastery."</p>
       </div>
@@ -471,6 +476,7 @@ export default function Home() {
           </p>
         </div>
       </div>
+
 
           <div className="info-section">
             <p>
