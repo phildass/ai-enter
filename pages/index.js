@@ -55,19 +55,6 @@ export default function Home() {
         .hero h1 {
           font-size: 4rem;
           margin-bottom: 1.5rem;
-<<<<<<< copilot/remove-solutions-main-links
-          font-weight: 700;
-          color: #667eea;
-          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-
-        .hero p {
-          font-size: 1.5rem;
-          margin-bottom: 2.5rem;
-          color: #667eea;
-          opacity: 0.95;
-          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
-=======
           font-weight: 800;
           text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
           line-height: 1.2;
@@ -122,7 +109,6 @@ export default function Home() {
           transform: translateY(-3px);
           background: white;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
->>>>>>> main
         }
 
         .container {
@@ -434,44 +420,6 @@ export default function Home() {
             Empowering businesses and individuals across India with cutting-edge technology solutions and affordable skill enhancement programs
           </p>
 
-<<<<<<< copilot/remove-solutions-main-links
-      <div className="quote-section">
-        <p className="quote">"Education is a right, not a luxury. No barriers. Just Mastery."</p>
-      </div>
-
-      <div className="courses-section">
-        <div className="courses-header">
-          <h2>Available Courses</h2>
-          <p>Courses available now: 9 | Five Free | Four Paid</p>
-        </div>
-
-        <div className="courses-grid">
-          {freeCourses.map((course) => (
-            <div key={course.id} className="course-card">
-              <span className="course-badge free-badge">FREE</span>
-              <h3 className="course-name">{course.name}</h3>
-            </div>
-          ))}
-        </div>
-
-        <div className="courses-grid">
-          {paidCourses.map((course) => (
-            <div key={course.id} className="course-card">
-              <span className="course-badge paid-badge">PAID</span>
-              <h3 className="course-name">{course.name}</h3>
-            </div>
-          ))}
-        </div>
-
-        <div className="combo-highlight">
-          <h3>🎁 Special Combo Offer!</h3>
-          <p>Get Learn AI + Learn Developer for the price of one!</p>
-          <p style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>
-            Rs 99 + GST = Rs 116.82
-          </p>
-        </div>
-      </div>
-=======
           <div className="info-section">
             <p>
               At AI Cloud Enterprises we offer Skill Enhancement Courses through iiskills.cloud. There are foundational free courses and premium paid courses—all available at very reasonable prices that every Indian can afford.
@@ -483,7 +431,6 @@ export default function Home() {
         </div>
 
         <div className="section-divider"></div>
->>>>>>> main
 
         <div className="section">
           <h2 className="section-title">Our Services</h2>

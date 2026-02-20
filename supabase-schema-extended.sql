@@ -143,9 +143,67 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- ============================================================
+-- Payment Transactions Table (Jai Kisan & Jai Bharat)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- User identification
+  user_id UUID NOT NULL,
+  user_email TEXT,
+
+  -- App identification
+  app_name TEXT NOT NULL, -- 'jai-kisan' or 'jai-bharat'
+
+  -- Payment details
+  razorpay_order_id TEXT NOT NULL,
+  razorpay_payment_id TEXT,
+  razorpay_signature TEXT,
+
+  amount DECIMAL(10, 2) NOT NULL DEFAULT 116.82,
+  currency TEXT DEFAULT 'INR',
+
+  -- Payment status
+  status TEXT DEFAULT 'pending', -- 'pending', 'success', 'failed'
+  payment_method TEXT, -- 'upi', 'card', 'netbanking', etc.
+
+  -- Webhook tracking
+  webhook_sent BOOLEAN DEFAULT false,
+  webhook_response TEXT,
+  webhook_sent_at TIMESTAMP,
+
+  -- Timestamps
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+
+  CONSTRAINT unique_razorpay_order UNIQUE(razorpay_order_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_app_name ON payment_transactions(app_name);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_id ON payment_transactions(razorpay_order_id);
+
+-- Enable Row Level Security
+ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can view their own transactions
+CREATE POLICY "Users can view own transactions"
+  ON payment_transactions FOR SELECT
+  USING (auth.uid() = user_id);
+
 -- Trigger to auto-update updated_at
 DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at
   BEFORE UPDATE ON users
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger to auto-update updated_at on payment_transactions
+DROP TRIGGER IF EXISTS update_payment_transactions_updated_at ON payment_transactions;
+CREATE TRIGGER update_payment_transactions_updated_at
+  BEFORE UPDATE ON payment_transactions
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
