@@ -55,8 +55,8 @@ export default function Home() {
         .hero h1 {
           font-size: 4rem;
           margin-bottom: 1.5rem;
-<<<<<<< copilot/remove-solutions-main-links
-          font-weight: 700;
+
+        font-weight: 700;
           color: #667eea;
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
@@ -67,7 +67,7 @@ export default function Home() {
           color: #667eea;
           opacity: 0.95;
           text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
-=======
+
           font-weight: 800;
           text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
           line-height: 1.2;
@@ -122,7 +122,7 @@ export default function Home() {
           transform: translateY(-3px);
           background: white;
           box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
->>>>>>> main
+
         }
 
         .container {
@@ -434,7 +434,7 @@ export default function Home() {
             Empowering businesses and individuals across India with cutting-edge technology solutions and affordable skill enhancement programs
           </p>
 
-<<<<<<< copilot/remove-solutions-main-links
+
       <div className="quote-section">
         <p className="quote">"Education is a right, not a luxury. No barriers. Just Mastery."</p>
       </div>
@@ -471,7 +471,7 @@ export default function Home() {
           </p>
         </div>
       </div>
-=======
+
           <div className="info-section">
             <p>
               At AI Cloud Enterprises we offer Skill Enhancement Courses through iiskills.cloud. There are foundational free courses and premium paid courses—all available at very reasonable prices that every Indian can afford.
@@ -483,7 +483,7 @@ export default function Home() {
         </div>
 
         <div className="section-divider"></div>
->>>>>>> main
+
 
         <div className="section">
           <h2 className="section-title">Our Services</h2>
