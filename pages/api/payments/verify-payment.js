@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
+import { signWebhookPayload } from '../../../lib/handoff';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,8 +12,7 @@ export default async function handler(req, res) {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
-    user_id,
-    app_name,
+    session_id,
   } = req.body;
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -54,9 +54,13 @@ export default async function handler(req, res) {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     let transactionId = null;
+    let transactionRecord = null;
 
     if (supabaseUrl && serviceRoleKey) {
       const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+      const paidAt = new Date().toISOString();
+
       const { data: transaction, error } = await supabase
         .from('payment_transactions')
         .update({
@@ -64,7 +68,8 @@ export default async function handler(req, res) {
           razorpay_signature,
           status: 'success',
           payment_method: paymentMethod,
-          updated_at: new Date().toISOString(),
+          paid_at: paidAt,
+          updated_at: paidAt,
         })
         .eq('razorpay_order_id', razorpay_order_id)
         .select()
@@ -74,28 +79,45 @@ export default async function handler(req, res) {
         console.error('Supabase update error:', error);
       } else {
         transactionId = transaction?.id;
+        transactionRecord = transaction;
 
-        // Send webhook to respective app backend
+        // Determine webhook URL for this app segment
+        const appName = transaction?.app_name;
         const webhookUrl =
-          app_name === 'jai-kisan'
+          appName === 'jai-kisan'
             ? process.env.JAI_KISAN_WEBHOOK_URL
-            : app_name === 'iiskills'
+            : appName === 'iiskills'
             ? process.env.IISKILLS_WEBHOOK_URL
             : process.env.JAI_BHARAT_WEBHOOK_URL;
 
         if (webhookUrl) {
           try {
+            const webhookPayload = {
+              session_id: transaction?.session_id || session_id || null,
+              app_name: appName,
+              user_id: transaction?.user_id || null,
+              user_email: transaction?.user_email || null,
+              user_phone: transaction?.user_phone || null,
+              amount_paise: Math.round((transaction?.amount || 116.82) * 100),
+              validity_days: transaction?.validity_days || 30,
+              razorpay_order_id,
+              razorpay_payment_id,
+              razorpay_signature,
+              status: 'success',
+              paid_at: transaction?.paid_at || paidAt,
+            };
+
+            const rawBody = JSON.stringify(webhookPayload);
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (process.env.ORIGIN_WEBHOOK_SECRET) {
+              headers['X-AI-ENTER-SIGNATURE'] = signWebhookPayload(rawBody);
+            }
+
             const webhookRes = await fetch(webhookUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                user_id,
-                transaction_id: razorpay_payment_id,
-                amount: 116.82,
-                payment_method: paymentMethod,
-                status: 'success',
-                signature: razorpay_signature,
-              }),
+              headers,
+              body: rawBody,
             });
             const webhookData = await webhookRes.json().catch(() => ({}));
 
@@ -118,6 +140,8 @@ export default async function handler(req, res) {
       success: true,
       message: 'Payment verified successfully',
       transactionId,
+      session_id: transactionRecord?.session_id || session_id || null,
+      return_url: transactionRecord?.return_url || null,
     });
   } catch (error) {
     console.error('Payment verification error:', error);

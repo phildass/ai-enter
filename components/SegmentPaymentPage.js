@@ -38,7 +38,7 @@ export default function SegmentPaymentPage({
   description,
 }) {
   const router = useRouter();
-  const { user_id, email } = router.query;
+  const { token } = router.query;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -51,11 +51,7 @@ export default function SegmentPaymentPage({
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id,
-          app_name: segmentKey,
-          user_email: email || '',
-        }),
+        body: JSON.stringify({ token }),
       });
 
       const orderData = await orderResponse.json();
@@ -85,15 +81,21 @@ export default function SegmentPaymentPage({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
-                user_id,
-                app_name: segmentKey,
+                session_id: orderData.session_id,
               }),
             });
 
             const verifyData = await verifyResponse.json();
 
             if (verifyData.success) {
-              router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+              // Redirect to origin's return_url with session_id and status
+              const returnUrl = verifyData.return_url || orderData.return_url;
+              if (returnUrl) {
+                const sep = returnUrl.includes('?') ? '&' : '?';
+                window.location.href = `${returnUrl}${sep}session_id=${encodeURIComponent(verifyData.session_id || orderData.session_id)}&status=success`;
+              } else {
+                router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+              }
             } else {
               setError('Payment verification failed. Please contact support.');
               setLoading(false);
@@ -124,7 +126,7 @@ export default function SegmentPaymentPage({
     }
   };
 
-  if (!user_id && typeof window !== 'undefined' && router.isReady) {
+  if (!token && typeof window !== 'undefined' && router.isReady) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgGradient }}>
         <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '400px' }}>
