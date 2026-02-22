@@ -2,6 +2,16 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const appDetails = {
+  'iiskills': {
+    name: 'IIS Skills',
+    emoji: '🎓',
+    bgColor: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+    cardBg: '#ede9fe',
+    titleColor: '#4c1d95',
+    accentColor: '#7c3aed',
+    borderColor: '#c4b5fd',
+    validity: '1 year',
+  },
   'jai-kisan': {
     name: 'Jai Kisan',
     emoji: '🌾',
@@ -10,6 +20,7 @@ const appDetails = {
     titleColor: '#14532d',
     accentColor: '#16a34a',
     borderColor: '#86efac',
+    validity: '1 month',
   },
   'jai-bharat': {
     name: 'Jai Bharat',
@@ -19,6 +30,7 @@ const appDetails = {
     titleColor: '#1e1b4b',
     accentColor: '#4f46e5',
     borderColor: '#a5b4fc',
+    validity: '1 month',
   },
 };
 
@@ -26,7 +38,7 @@ export default function PaymentSuccess() {
   const router = useRouter();
   const { app } = router.query;
 
-  const currentApp = appDetails[app] || appDetails['jai-kisan'];
+  const currentApp = appDetails[app] || appDetails['iiskills'];
 
   return (
     <>
@@ -92,7 +104,7 @@ export default function PaymentSuccess() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
             <p>✅ Payment Amount: ₹116.82</p>
-            <p>✅ Lifetime Access Granted</p>
+            <p>✅ Access Valid for {currentApp.validity}</p>
             <p>✅ No Recurring Fees</p>
           </div>
 

@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'user_id and app_name are required' });
   }
 
-  if (!['jai-kisan', 'jai-bharat'].includes(app_name)) {
+  if (!['iiskills', 'jai-kisan', 'jai-bharat'].includes(app_name)) {
     return res.status(400).json({ error: 'Invalid app_name' });
   }
 

@@ -79,6 +79,8 @@ export default async function handler(req, res) {
         const webhookUrl =
           app_name === 'jai-kisan'
             ? process.env.JAI_KISAN_WEBHOOK_URL
+            : app_name === 'iiskills'
+            ? process.env.IISKILLS_WEBHOOK_URL
             : process.env.JAI_BHARAT_WEBHOOK_URL;
 
         if (webhookUrl) {
