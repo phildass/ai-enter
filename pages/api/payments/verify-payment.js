@@ -1,7 +1,11 @@
 import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
+
 import { signWebhookPayload } from '../../../lib/handoff';
+
+import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,7 +16,13 @@ export default async function handler(req, res) {
     razorpay_order_id,
     razorpay_payment_id,
     razorpay_signature,
+
     session_id,
+
+    session_token,
+    user_id: bodyUserId,
+    app_name: bodyAppName,
+
   } = req.body;
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -21,6 +31,37 @@ export default async function handler(req, res) {
 
   if (!process.env.RAZORPAY_KEY_SECRET) {
     return res.status(500).json({ error: 'Payment system not configured' });
+  }
+
+  // Resolve user_id, app_name, and webhook URL
+  let user_id, app_name, webhookUrl;
+
+  if (session_token) {
+    // Token-based flow (jai-bharat, jai-kisan): verify token and use its data
+    let payload;
+    try {
+      payload = verifyHandoffToken(session_token);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Invalid session token' });
+    }
+    user_id = payload.user_id;
+    app_name = payload.app_name;
+    // Always use environment-configured webhook URL (not token's return_url)
+    // to prevent origin sites from redirecting webhooks to arbitrary endpoints
+    webhookUrl =
+      app_name === 'jai-kisan'
+        ? process.env.JAI_KISAN_WEBHOOK_URL
+        : process.env.JAI_BHARAT_WEBHOOK_URL;
+  } else {
+    // Legacy flow (iiskills and direct API callers)
+    user_id = bodyUserId;
+    app_name = bodyAppName;
+    webhookUrl =
+      app_name === 'jai-kisan'
+        ? process.env.JAI_KISAN_WEBHOOK_URL
+        : app_name === 'iiskills'
+        ? process.env.IISKILLS_WEBHOOK_URL
+        : process.env.JAI_BHARAT_WEBHOOK_URL;
   }
 
   try {
@@ -81,6 +122,7 @@ export default async function handler(req, res) {
         transactionId = transaction?.id;
         transactionRecord = transaction;
 
+
         // Determine webhook URL for this app segment
         const appName = transaction?.app_name;
         const webhookUrl =
@@ -89,6 +131,9 @@ export default async function handler(req, res) {
             : appName === 'iiskills'
             ? process.env.IISKILLS_WEBHOOK_URL
             : process.env.JAI_BHARAT_WEBHOOK_URL;
+
+
+        // Send webhook to respective app backend (URL resolved above from token or env)
 
         if (webhookUrl) {
           try {
