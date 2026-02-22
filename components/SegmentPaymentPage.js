@@ -36,9 +36,16 @@ export default function SegmentPaymentPage({
   features,
   originDomain,
   description,
+  tokenPayload,
+  rawToken,
+  tokenError,
 }) {
   const router = useRouter();
-  const { user_id, email } = router.query;
+
+  // For token-based flow (jai-bharat, jai-kisan): use verified server-side payload.
+  // For legacy flow (iiskills): fall back to query params.
+  const user_id = tokenPayload ? tokenPayload.user_id : router.query.user_id;
+  const email = tokenPayload ? tokenPayload.user_email : router.query.email;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,14 +55,14 @@ export default function SegmentPaymentPage({
     setError('');
 
     try {
+      const orderBody = rawToken
+        ? { session_token: rawToken }
+        : { user_id, app_name: segmentKey, user_email: email || '' };
+
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id,
-          app_name: segmentKey,
-          user_email: email || '',
-        }),
+        body: JSON.stringify(orderBody),
       });
 
       const orderData = await orderResponse.json();
@@ -78,16 +85,25 @@ export default function SegmentPaymentPage({
           description,
           order_id: orderData.orderId,
           handler: async function (response) {
+            const verifyBody = rawToken
+              ? {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  session_token: rawToken,
+                }
+              : {
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  user_id,
+                  app_name: segmentKey,
+                };
+
             const verifyResponse = await fetch('/api/payments/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                user_id,
-                app_name: segmentKey,
-              }),
+              body: JSON.stringify(verifyBody),
             });
 
             const verifyData = await verifyResponse.json();
@@ -124,12 +140,16 @@ export default function SegmentPaymentPage({
     }
   };
 
-  if (!user_id && typeof window !== 'undefined' && router.isReady) {
+  const shouldShowError =
+    tokenError ||
+    (!tokenPayload && !user_id && typeof window !== 'undefined' && router.isReady);
+
+  if (shouldShowError) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgGradient }}>
         <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '400px' }}>
           <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.95rem' }}>
-            Invalid payment link. Please open from {originDomain}.
+            {tokenError || `Invalid payment link. Please open from ${originDomain}.`}
           </p>
         </div>
       </div>
