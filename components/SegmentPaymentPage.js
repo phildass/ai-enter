@@ -42,10 +42,13 @@ export default function SegmentPaymentPage({
 }) {
   const router = useRouter();
 
+  const { token } = router.query;=======
+
   // For token-based flow (jai-bharat, jai-kisan): use verified server-side payload.
   // For legacy flow (iiskills): fall back to query params.
   const user_id = tokenPayload ? tokenPayload.user_id : router.query.user_id;
   const email = tokenPayload ? tokenPayload.user_email : router.query.email;
+
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -62,7 +65,11 @@ export default function SegmentPaymentPage({
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+
+        body: JSON.stringify({ token }),
+
         body: JSON.stringify(orderBody),
+
       });
 
       const orderData = await orderResponse.json();
@@ -103,13 +110,27 @@ export default function SegmentPaymentPage({
             const verifyResponse = await fetch('/api/payments/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                session_id: orderData.session_id,
+              }),
+
               body: JSON.stringify(verifyBody),
             });
 
             const verifyData = await verifyResponse.json();
 
             if (verifyData.success) {
-              router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+              // Redirect to origin's return_url with session_id and status
+              const returnUrl = verifyData.return_url || orderData.return_url;
+              if (returnUrl) {
+                const sep = returnUrl.includes('?') ? '&' : '?';
+                window.location.href = `${returnUrl}${sep}session_id=${encodeURIComponent(verifyData.session_id || orderData.session_id)}&status=success`;
+              } else {
+                router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+              }
             } else {
               setError('Payment verification failed. Please contact support.');
               setLoading(false);
@@ -140,11 +161,15 @@ export default function SegmentPaymentPage({
     }
   };
 
+
+  if (!token && typeof window !== 'undefined' && router.isReady) {
+
   const shouldShowError =
     tokenError ||
     (!tokenPayload && !user_id && typeof window !== 'undefined' && router.isReady);
 
   if (shouldShowError) {
+
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgGradient }}>
         <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '400px' }}>

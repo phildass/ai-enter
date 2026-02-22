@@ -1,11 +1,18 @@
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
+
+import { verifyHandoffToken } from '../../../lib/handoff';
+
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
+
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+
+  const { token } = req.body;
 
   let user_id, app_name, user_email;
 
@@ -25,17 +32,33 @@ export default async function handler(req, res) {
     ({ user_id, app_name, user_email } = req.body);
   }
 
-  if (!user_id || !app_name) {
-    return res.status(400).json({ error: 'user_id and app_name are required' });
-  }
 
-  if (!['iiskills', 'jai-kisan', 'jai-bharat'].includes(app_name)) {
-    return res.status(400).json({ error: 'Invalid app_name' });
+  if (!token) {
+    return res.status(400).json({ error: 'Signed handoff token is required' });
   }
 
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
     return res.status(500).json({ error: 'Payment system not configured' });
   }
+
+  let payload;
+  try {
+    payload = verifyHandoffToken(token);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const {
+    app_name,
+    user_id,
+    user_email,
+    user_phone,
+    session_id,
+    amount_paise,
+    currency,
+    validity_days,
+    return_url,
+  } = payload;
 
   try {
     const razorpay = new Razorpay({
@@ -44,12 +67,13 @@ export default async function handler(req, res) {
     });
 
     const order = await razorpay.orders.create({
-      amount: 11682, // ₹116.82 in paise
-      currency: 'INR',
-      receipt: `${app_name}_${user_id}_${Date.now()}`,
+      amount: amount_paise || 11682,
+      currency: currency || 'INR',
+      receipt: `${app_name}_${session_id}`,
       notes: {
         user_id,
         app_name,
+        session_id,
         user_email: user_email || '',
       },
     });
@@ -65,10 +89,14 @@ export default async function handler(req, res) {
         .insert({
           user_id,
           user_email: user_email || null,
+          user_phone: user_phone || null,
           app_name,
+          session_id,
           razorpay_order_id: order.id,
-          amount: 116.82,
-          currency: 'INR',
+          amount: (amount_paise || 11682) / 100,
+          currency: currency || 'INR',
+          validity_days: validity_days || 30,
+          return_url: return_url || null,
           status: 'pending',
         });
 
@@ -82,6 +110,8 @@ export default async function handler(req, res) {
       amount: order.amount,
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
+      session_id,
+      return_url: return_url || null,
     });
   } catch (error) {
     console.error('Order creation error:', error);

@@ -153,9 +153,13 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   -- User identification
   user_id UUID NOT NULL,
   user_email TEXT,
+  user_phone TEXT,
 
   -- App identification
   app_name TEXT NOT NULL, -- 'jai-kisan' or 'jai-bharat'
+
+  -- Handoff session tracking
+  session_id TEXT,
 
   -- Payment details
   razorpay_order_id TEXT NOT NULL,
@@ -164,19 +168,24 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
 
   amount DECIMAL(10, 2) NOT NULL DEFAULT 116.82,
   currency TEXT DEFAULT 'INR',
+  validity_days INTEGER DEFAULT 30,
+
+  -- Origin return URL (from handoff token)
+  return_url TEXT,
 
   -- Payment status
   status TEXT DEFAULT 'pending', -- 'pending', 'success', 'failed'
   payment_method TEXT, -- 'upi', 'card', 'netbanking', etc.
+  paid_at TIMESTAMP WITH TIME ZONE,
 
   -- Webhook tracking
   webhook_sent BOOLEAN DEFAULT false,
   webhook_response TEXT,
-  webhook_sent_at TIMESTAMP,
+  webhook_sent_at TIMESTAMP WITH TIME ZONE,
 
   -- Timestamps
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
   CONSTRAINT unique_razorpay_order UNIQUE(razorpay_order_id)
 );
@@ -185,6 +194,20 @@ CREATE INDEX IF NOT EXISTS idx_payment_transactions_user_id ON payment_transacti
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_app_name ON payment_transactions(app_name);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_status ON payment_transactions(status);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_id ON payment_transactions(razorpay_order_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_session_id ON payment_transactions(session_id);
+
+-- Migrate existing payment_transactions tables: add new columns if they don't exist
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS user_phone TEXT;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS session_id TEXT;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS validity_days INTEGER DEFAULT 30;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS return_url TEXT;
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE payment_transactions ALTER COLUMN webhook_sent_at TYPE TIMESTAMP WITH TIME ZONE;
+
+-- Unique index on session_id, ignoring NULL values (safe for existing rows with NULL session_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_session_id_unique
+  ON payment_transactions(session_id)
+  WHERE session_id IS NOT NULL;
 
 -- Enable Row Level Security
 ALTER TABLE payment_transactions ENABLE ROW LEVEL SECURITY;
