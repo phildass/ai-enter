@@ -1,6 +1,20 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
+import { verifyHandoffToken } from '../../lib/verifyHandoffToken';
 
-export default function JaiKisanPay() {
+export async function getServerSideProps({ query }) {
+  const { token } = query;
+  if (!token) {
+    return { props: { tokenError: 'Missing payment token. Please open from jaikisan.cloud.' } };
+  }
+  try {
+    const payload = verifyHandoffToken(token);
+    return { props: { tokenPayload: payload, rawToken: token } };
+  } catch (err) {
+    return { props: { tokenError: 'Invalid payment link. Please open from jaikisan.cloud.' } };
+  }
+}
+
+export default function JaiKisanPay({ tokenPayload, rawToken, tokenError }) {
   return (
     <SegmentPaymentPage
       segmentKey="jai-kisan"
@@ -22,6 +36,9 @@ export default function JaiKisanPay() {
       ]}
       originDomain="jaikisan.cloud"
       description="1-Month Access - Agricultural Support"
+      tokenPayload={tokenPayload || null}
+      rawToken={rawToken || null}
+      tokenError={tokenError || null}
     />
   );
 }

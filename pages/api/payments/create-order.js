@@ -1,12 +1,29 @@
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
+import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { user_id, app_name, user_email } = req.body;
+  let user_id, app_name, user_email;
+
+  if (req.body.session_token) {
+    // Token-based flow (jai-bharat, jai-kisan)
+    let payload;
+    try {
+      payload = verifyHandoffToken(req.body.session_token);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Invalid session token' });
+    }
+    user_id = payload.user_id;
+    app_name = payload.app_name;
+    user_email = payload.user_email || '';
+  } else {
+    // Legacy flow (iiskills and direct API callers)
+    ({ user_id, app_name, user_email } = req.body);
+  }
 
   if (!user_id || !app_name) {
     return res.status(400).json({ error: 'user_id and app_name are required' });
