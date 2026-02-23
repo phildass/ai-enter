@@ -98,7 +98,40 @@ CREATE POLICY "Allow read for all" ON purchases
   FOR SELECT USING (true);
 ```
 
-### 3. Access Purchase Records
+### 3. Create the Crowdfund Payments Table
+
+Run this SQL in the Supabase SQL Editor to support the `/crowdfund` payment flow:
+
+```sql
+-- Create crowdfund_payments table
+CREATE TABLE crowdfund_payments (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  customer_name TEXT NOT NULL,
+  customer_phone TEXT NOT NULL,
+  amount_inr NUMERIC NOT NULL,
+  razorpay_order_id TEXT NOT NULL,
+  razorpay_payment_id TEXT NOT NULL,
+  payment_status TEXT NOT NULL DEFAULT 'completed',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for faster queries
+CREATE INDEX idx_crowdfund_phone ON crowdfund_payments(customer_phone);
+CREATE INDEX idx_crowdfund_created ON crowdfund_payments(created_at DESC);
+
+-- Enable Row Level Security
+ALTER TABLE crowdfund_payments ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow inserts (for payment recording)
+CREATE POLICY "Allow insert for all" ON crowdfund_payments
+  FOR INSERT WITH CHECK (true);
+
+-- Create policy to allow reads (for admin access)
+CREATE POLICY "Allow read for all" ON crowdfund_payments
+  FOR SELECT USING (true);
+```
+
+### 4. Access Purchase Records
 
 You can query purchases in Supabase:
 
