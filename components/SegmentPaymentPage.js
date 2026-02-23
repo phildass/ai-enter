@@ -42,8 +42,6 @@ export default function SegmentPaymentPage({
 }) {
   const router = useRouter();
 
-  const { token } = router.query;=======
-
   // For token-based flow (jai-bharat, jai-kisan): use verified server-side payload.
   // For legacy flow (iiskills): fall back to query params.
   const user_id = tokenPayload ? tokenPayload.user_id : router.query.user_id;
@@ -65,11 +63,7 @@ export default function SegmentPaymentPage({
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-
-        body: JSON.stringify({ token }),
-
         body: JSON.stringify(orderBody),
-
       });
 
       const orderData = await orderResponse.json();
@@ -110,13 +104,6 @@ export default function SegmentPaymentPage({
             const verifyResponse = await fetch('/api/payments/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-                session_id: orderData.session_id,
-              }),
-
               body: JSON.stringify(verifyBody),
             });
 
@@ -161,8 +148,6 @@ export default function SegmentPaymentPage({
     }
   };
 
-
-  if (!token && typeof window !== 'undefined' && router.isReady) {
 
   const shouldShowError =
     tokenError ||

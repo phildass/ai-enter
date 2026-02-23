@@ -1,8 +1,6 @@
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 
-import { verifyHandoffToken } from '../../../lib/handoff';
-
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 
 
@@ -11,10 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-
-  const { token } = req.body;
-
-  let user_id, app_name, user_email;
+  let user_id, app_name, user_email, user_phone, session_id, amount_paise, currency, validity_days, return_url;
 
   if (req.body.session_token) {
     // Token-based flow (jai-bharat, jai-kisan)
@@ -27,38 +22,20 @@ export default async function handler(req, res) {
     user_id = payload.user_id;
     app_name = payload.app_name;
     user_email = payload.user_email || '';
+    user_phone = payload.user_phone;
+    session_id = payload.session_id;
+    amount_paise = payload.amount_paise;
+    currency = payload.currency;
+    validity_days = payload.validity_days;
+    return_url = payload.return_url;
   } else {
     // Legacy flow (iiskills and direct API callers)
     ({ user_id, app_name, user_email } = req.body);
   }
 
-
-  if (!token) {
-    return res.status(400).json({ error: 'Signed handoff token is required' });
-  }
-
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
     return res.status(500).json({ error: 'Payment system not configured' });
   }
-
-  let payload;
-  try {
-    payload = verifyHandoffToken(token);
-  } catch (err) {
-    return res.status(400).json({ error: err.message });
-  }
-
-  const {
-    app_name,
-    user_id,
-    user_email,
-    user_phone,
-    session_id,
-    amount_paise,
-    currency,
-    validity_days,
-    return_url,
-  } = payload;
 
   try {
     const razorpay = new Razorpay({
