@@ -1,13 +1,13 @@
 import Head from 'next/head';
 import Link from 'next/link';
 
-export default function Layout({ children, title = 'AI Cloud Enterprises - Smart SaaS Solutions' }) {
+export default function Layout({ children, title = 'AI Cloud Enterprises - Building Software Solutions for Public and Private Use' }) {
   return (
     <>
       <Head>
         <title>{title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="AI Cloud Enterprises - Smart SaaS Solutions for the Future" />
+        <meta name="description" content="AI Cloud Enterprises — a corporate software company building platforms for education, public services, and agriculture across India." />
         <link rel="icon" type="image/png" href="/images/aienter-favicon.png" />
         <link rel="apple-touch-icon" href="/images/aienter-favicon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

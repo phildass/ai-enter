@@ -91,7 +91,7 @@ export default function Privacy() {
           <p>
             AI Cloud Enterprises ("we," "our," or "us") is committed to protecting your privacy. 
             This Privacy Policy explains how we collect, use, disclose, and safeguard your information 
-            when you visit our website and enroll in our courses.
+            when you visit our websites or use our products and services — including IISkills, Jai Bharat, and Jai Kisan.
           </p>
 
           <h2>2. Information We Collect</h2>
@@ -106,9 +106,9 @@ export default function Privacy() {
           <h2>3. How We Use Your Information</h2>
           <p>We use the information we collect to:</p>
           <ul>
-            <li>Process your course enrollments and payments</li>
-            <li>Provide and deliver the courses you have enrolled in</li>
-            <li>Send you updates, course materials, and administrative information</li>
+            <li>Process your subscriptions and payments</li>
+            <li>Provide and deliver the products and services you have purchased</li>
+            <li>Send you updates, product materials, and administrative information</li>
             <li>Respond to your inquiries and provide customer support</li>
             <li>Improve our services and develop new offerings</li>
             <li>Comply with legal obligations</li>

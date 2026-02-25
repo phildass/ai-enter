@@ -1,24 +1,45 @@
 import Layout from '../components/Layout';
 import Link from 'next/link';
 
+const products = [
+  {
+    key: 'iiskills',
+    name: 'IISkills',
+    tagline: 'Professional skills and learning apps',
+    description: 'A suite of learning applications for professional development, skill-building, and career advancement.',
+    domain: 'iiskills.cloud',
+    paymentPath: '/payments/iiskills',
+    color: '#7c3aed',
+    bg: '#ede9fe',
+    emoji: '📚',
+  },
+  {
+    key: 'jaibharat',
+    name: 'Jai Bharat',
+    tagline: 'Government jobs & exam preparation',
+    description: 'Comprehensive platform for government job discovery and exam prep across India — banks, UPSC, SSC, Railways, and more.',
+    domain: 'jaibharat.cloud',
+    paymentPath: '/payments/jaibharat',
+    color: '#4f46e5',
+    bg: '#e0e7ff',
+    emoji: '🏛️',
+  },
+  {
+    key: 'jaikisan',
+    name: 'Jai Kisan',
+    tagline: 'Farmer assistant in 12+ Indian languages',
+    description: 'Voice-driven assistant for farmers across India — fertilizers, weather, market rates, and crop guidance via oral commands.',
+    domain: 'jaikisan.cloud',
+    paymentPath: '/payments/jaikisan',
+    color: '#16a34a',
+    bg: '#dcfce7',
+    emoji: '🌾',
+  },
+];
+
 export default function Home() {
-  const freeCourses = [
-    { name: 'Learn Chemistry', id: 'learn-chemistry' },
-    { name: 'Learn Geography', id: 'learn-geography' },
-    { name: 'Learn Math', id: 'learn-math' },
-    { name: 'Learn Physics', id: 'learn-physics' },
-    { name: 'Learn Apt', id: 'learn-apt' }
-  ];
-
-  const paidCourses = [
-    { name: 'Learn PR', id: 'learn-pr' },
-    { name: 'Learn AI', id: 'learn-ai' },
-    { name: 'Learn Management', id: 'learn-management' },
-    { name: 'Learn Developer', id: 'learn-developer' }
-  ];
-
   return (
-    <Layout title="AI Cloud Enterprises - Transform Your Future with AI">
+    <Layout title="AI Cloud Enterprises - Building Software Solutions for Public and Private Use">
       <style jsx>{`
         .hero {
           position: relative;
@@ -221,13 +242,6 @@ export default function Home() {
           font-size: 1.05rem;
         }
 
-        .value-props {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 2rem;
-          margin-top: 3rem;
-        }
-
         .value-card {
           background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
           padding: 2.5rem;
@@ -270,108 +284,69 @@ export default function Home() {
           margin-bottom: 1.5rem;
         }
 
-        .courses-section {
-          background: #f8f9ff;
-          padding: 4rem 2rem;
-        }
-
-        .courses-header {
-          text-align: center;
-          margin-bottom: 3rem;
-        }
-
-        .courses-header h2 {
-          font-size: 2.5rem;
-          color: #667eea;
-          margin-bottom: 1rem;
-        }
-
-        .courses-header p {
-          font-size: 1.3rem;
-          color: #666;
-        }
-
-        .courses-grid {
+        .products-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          gap: 2rem;
-          max-width: 1200px;
-          margin: 0 auto 3rem;
+          grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+          gap: 2.5rem;
+          margin-top: 4rem;
         }
 
-        .course-card {
+        .product-card {
           background: white;
-          padding: 2rem;
-          border-radius: 15px;
-          box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-          transition: all 0.3s;
-          text-align: center;
-        }
-
-        .course-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-        }
-
-        .course-badge {
-          display: inline-block;
-          padding: 0.5rem 1rem;
           border-radius: 20px;
-          font-weight: 600;
-          margin-bottom: 1rem;
-          font-size: 0.9rem;
+          padding: 2.5rem;
+          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+          transition: all 0.4s ease;
+          border: 1px solid rgba(102, 126, 234, 0.1);
         }
 
-        .free-badge {
-          background: #d4edda;
-          color: #155724;
+        .product-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 20px 50px rgba(102, 126, 234, 0.15);
         }
 
-        .paid-badge {
-          background: #fff3cd;
-          color: #856404;
-        }
-
-        .course-name {
-          font-size: 1.3rem;
-          color: #333;
-          font-weight: 600;
-        }
-
-        .combo-highlight {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          color: white;
-          padding: 2rem;
-          border-radius: 15px;
-          text-align: center;
-          margin: 2rem auto;
-          max-width: 800px;
-        }
-
-        .combo-highlight h3 {
-          font-size: 2rem;
-          margin-bottom: 1rem;
-        }
-
-        .combo-highlight p {
-          font-size: 1.2rem;
-          opacity: 0.95;
-        }
-
-        .quote-section {
-          background: white;
-          padding: 3rem 2rem;
-          text-align: center;
-          border-top: 3px solid #667eea;
-          border-bottom: 3px solid #667eea;
-        }
-
-        .quote {
+        .product-icon {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-size: 1.8rem;
+          margin-bottom: 1.25rem;
+        }
+
+        .product-card h3 {
+          font-size: 1.5rem;
+          margin-bottom: 0.4rem;
+          font-weight: 700;
+        }
+
+        .product-tagline {
+          font-size: 0.95rem;
+          font-weight: 600;
+          color: #555;
+          margin-bottom: 0.75rem;
+        }
+
+        .product-desc {
+          color: #666;
+          line-height: 1.7;
+          font-size: 0.95rem;
+          margin-bottom: 1.25rem;
+        }
+
+        .product-links {
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+          align-items: center;
+        }
+
+        .product-link-ext {
+          font-size: 0.85rem;
           color: #667eea;
-          font-style: italic;
-          max-width: 900px;
-          margin: 0 auto;
+          text-decoration: underline;
         }
 
         @media (max-width: 768px) {
@@ -409,129 +384,51 @@ export default function Home() {
           .info-section {
             padding: 2.5rem;
           }
-
-          .courses-grid {
-            grid-template-columns: 1fr;
-          }
         }
       `}</style>
 
       <div className="hero">
         <div className="hero-content">
           <h1>AI Cloud Enterprises</h1>
-          <p>Smart SaaS Solutions for India's Digital Future</p>
+          <p>Building software solutions for public and private use</p>
           <div className="cta-buttons">
-            <Link href="/solutions" className="btn btn-primary">
-              Explore Solutions
+            <Link href="/contact" className="btn btn-primary">
+              Contact Us
             </Link>
-            <Link href="/contact" className="btn btn-secondary">
-              Get in Touch
+            <Link href="/payments" className="btn btn-secondary">
+              Payments Portal
             </Link>
           </div>
         </div>
       </div>
 
       <div className="container">
-        <div className="section">
-          <h2 className="section-title">Why Choose AI Cloud Enterprises?</h2>
-          <p className="section-subtitle">
-            Empowering businesses and individuals across India with cutting-edge technology solutions and affordable skill enhancement programs
-          </p>
-
-
-
-      <div className="quote-section">
-        <p className="quote">"Education is a right, not a luxury. No barriers. Just Mastery."</p>
-      </div>
-
-      <div className="courses-section">
-        <div className="courses-header">
-          <h2>Available Courses</h2>
-          <p>Courses available now: 9 | Five Free | Four Paid</p>
-        </div>
-
-        <div className="courses-grid">
-          {freeCourses.map((course) => (
-            <div key={course.id} className="course-card">
-              <span className="course-badge free-badge">FREE</span>
-              <h3 className="course-name">{course.name}</h3>
-            </div>
-          ))}
-        </div>
-
-        <div className="courses-grid">
-          {paidCourses.map((course) => (
-            <div key={course.id} className="course-card">
-              <span className="course-badge paid-badge">PAID</span>
-              <h3 className="course-name">{course.name}</h3>
-            </div>
-          ))}
-        </div>
-
-        <div className="combo-highlight">
-          <h3>🎁 Special Combo Offer!</h3>
-          <p>Get Learn AI + Learn Developer for the price of one!</p>
-          <p style={{ marginTop: '1rem', fontSize: '1.5rem', fontWeight: 'bold' }}>
-            Rs 99 + GST = Rs 116.82
-          </p>
-        </div>
-      </div>
-
-
-          <div className="info-section">
-            <p>
-              At AI Cloud Enterprises we offer Skill Enhancement Courses through iiskills.cloud. There are foundational free courses and premium paid courses—all available at very reasonable prices that every Indian can afford.
-            </p>
-            <p>
-              AI Cloud Enterprises also delivers SaaS-based solutions for scalable training, development, and app creation across universal uses and industries. Our expertise covers the development of education platforms, business automation apps, and digital transformation tools for organizations nationwide.
-            </p>
-          </div>
-        </div>
-
-        <div className="section-divider"></div>
-
 
         <div className="section">
-          <h2 className="section-title">Our Services</h2>
+          <h2 className="section-title">What We Do</h2>
           <p className="section-subtitle">
-            Comprehensive solutions that touch every aspect of digital transformation
+            AI Cloud Enterprises designs and operates software platforms for education, public services, and agriculture — serving individuals, institutions, and enterprises across India.
           </p>
 
           <div className="features-grid">
             <div className="feature-card">
-              <span className="feature-icon">🎓</span>
-              <h3>Skill Enhancement</h3>
-              <p>Access free and premium courses through iiskills.cloud. From foundational to advanced topics, we make quality education affordable for every Indian.</p>
+              <h3>Product Engineering</h3>
+              <p>We build and maintain purpose-built SaaS platforms for defined domains — from professional learning to government job discovery and farmer assistance.</p>
             </div>
 
             <div className="feature-card">
-              <span className="feature-icon">☁️</span>
-              <h3>SaaS Solutions</h3>
-              <p>Scalable, cloud-based platforms designed for businesses of all sizes. Our solutions grow with your organization's needs.</p>
+              <h3>AI-Enabled Solutions</h3>
+              <p>Our products incorporate AI and voice capabilities to serve users in multiple Indian languages, making digital services accessible to a broader population.</p>
             </div>
 
             <div className="feature-card">
-              <span className="feature-icon">📱</span>
-              <h3>App Development</h3>
-              <p>Custom mobile and web applications tailored to your industry. From education platforms to business automation tools.</p>
+              <h3>Secure Payment Infrastructure</h3>
+              <p>We operate a shared, Razorpay-backed payment gateway on behalf of our product brands, with signed token verification and webhook integrity checks.</p>
             </div>
 
             <div className="feature-card">
-              <span className="feature-icon">🚀</span>
-              <h3>Digital Transformation</h3>
-              <p>Complete digital transformation services for organizations. We help you modernize operations and reach new heights.</p>
-            </div>
-
-            <div className="feature-card">
-              <span className="feature-icon">🏢</span>
-              <h3>Enterprise Solutions</h3>
-              <p>Robust business automation and management systems designed for the unique challenges of Indian enterprises.</p>
-            </div>
-
-            <div className="feature-card">
-              <span className="feature-icon">💡</span>
-              <h3>Innovation Partners</h3>
-              <p>Work with us to bring your innovative ideas to life. We're committed to building India's digital future together.</p>
+              <h3>Citizen &amp; Public Sector Services</h3>
+              <p>Platforms designed for India's public — government job seekers, farmers, and skill builders — with appropriate language support and offline-tolerant design.</p>
             </div>
           </div>
         </div>
@@ -539,26 +436,50 @@ export default function Home() {
         <div className="section-divider"></div>
 
         <div className="section">
-          <h2 className="section-title">Our Impact</h2>
-          <div className="value-props" role="list">
-            <div className="value-card" role="listitem">
-              <div className="value-number" aria-label="Over 10,000">10K+</div>
-              <div className="value-label">Students Enrolled</div>
-            </div>
-            <div className="value-card" role="listitem">
-              <div className="value-number" aria-label="Over 50">50+</div>
-              <div className="value-label">Corporate Clients</div>
-            </div>
-            <div className="value-card" role="listitem">
-              <div className="value-number" aria-label="100 percent">100%</div>
-              <div className="value-label">Satisfaction Rate</div>
-            </div>
-            <div className="value-card" role="listitem">
-              <div className="value-number" aria-label="24 hours, 7 days a week">24/7</div>
-              <div className="value-label">Support Available</div>
-            </div>
+          <h2 className="section-title">Our Products</h2>
+          <p className="section-subtitle">
+            Focused platforms serving distinct user needs — connected through a shared, secure payment infrastructure.
+          </p>
+
+          <div className="products-grid">
+            {products.map((product) => (
+              <div key={product.key} className="product-card" style={{ borderTop: `4px solid ${product.color}` }}>
+                <div className="product-icon" style={{ background: product.bg, color: product.color }}>
+                  {product.emoji}
+                </div>
+                <h3 style={{ color: product.color }}>{product.name}</h3>
+                <p className="product-tagline">{product.tagline}</p>
+                <p className="product-desc">{product.description}</p>
+                <div className="product-links">
+                  <a href={`https://${product.domain}`} target="_blank" rel="noopener noreferrer" className="product-link-ext">
+                    {product.domain}
+                  </a>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
+
+        <div className="section-divider"></div>
+
+        <div className="section">
+          <h2 className="section-title">Security &amp; Trust</h2>
+          <p className="section-subtitle">
+            Payments and data handled with industry-standard security practices.
+          </p>
+          <div className="info-section">
+            <p>
+              All payments are processed through <strong>Razorpay</strong>, a PCI-DSS compliant payment gateway. We do not store card or banking credentials on our servers.
+            </p>
+            <p>
+              Cross-platform payment handoffs use HMAC-signed tokens with expiry validation. Webhook callbacks to product platforms are signed and verified for integrity.
+            </p>
+            <p>
+              User data is stored in a secured database with role-level access controls. We comply with applicable Indian data protection guidelines.
+            </p>
+          </div>
+        </div>
+
       </div>
     </Layout>
   );

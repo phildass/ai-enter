@@ -194,7 +194,7 @@ export default function About() {
 
       <div className="about-hero">
         <h1>About AI Cloud Enterprises</h1>
-        <p>Leading the way in AI education and cloud solutions for a smarter tomorrow</p>
+        <p>A corporate software company building platforms for public and private use across India</p>
       </div>
 
       <div className="container">
@@ -203,14 +203,10 @@ export default function About() {
             <div>
               <h2>Our Mission</h2>
               <p>
-                At AI Cloud Enterprises, we're committed to democratizing access to cutting-edge AI and cloud 
-                technologies. We believe that everyone should have the opportunity to learn, grow, and excel 
-                in the rapidly evolving tech landscape.
+                AI Cloud Enterprises designs, builds, and operates software platforms that serve real needs — from professional learning and government job preparation to agricultural assistance for farmers across India.
               </p>
               <p>
-                Our courses are designed by industry experts who bring real-world experience into the classroom. 
-                We focus on practical, hands-on learning that prepares our students for successful careers in 
-                AI, machine learning, cloud computing, and data science.
+                We focus on purposeful product engineering: each platform is built for a specific audience, in appropriate languages, with the infrastructure and security required for reliable production use.
               </p>
             </div>
             {images[0] && (
@@ -227,16 +223,13 @@ export default function About() {
             <div>
               <h2>Our Approach</h2>
               <p>
-                We combine theoretical knowledge with practical application, ensuring that our students not 
-                only understand concepts but can also implement them in real-world scenarios.
+                We build and maintain focused SaaS products under distinct brands — IISkills, Jai Bharat, and Jai Kisan — each solving a well-defined problem for a distinct user base.
               </p>
               <p>
-                Through project-based learning, mentorship programs, and industry partnerships, we create a 
-                comprehensive learning ecosystem that supports our students from enrollment to career placement.
+                Shared infrastructure, including a common payment gateway, reduces integration overhead while keeping each product experience clean and brand-appropriate.
               </p>
               <p>
-                Our curriculum is constantly updated to reflect the latest industry trends and technologies, 
-                ensuring that our graduates are always ahead of the curve.
+                We prioritize reliability, security, and accessibility — including multi-language and voice-first interfaces for users in rural and semi-urban India.
               </p>
             </div>
           </div>
@@ -247,23 +240,23 @@ export default function About() {
           <div className="values-grid">
             <div className="value-card">
               <div className="value-icon">🎯</div>
-              <h3>Excellence</h3>
-              <p>We strive for excellence in everything we do, from course content to student support.</p>
+              <h3>Focus</h3>
+              <p>Each product serves a specific need. We avoid building generic platforms that serve no one well.</p>
             </div>
             <div className="value-card">
-              <div className="value-icon">🤝</div>
-              <h3>Collaboration</h3>
-              <p>We believe in the power of community and collaborative learning.</p>
+              <div className="value-icon">🔒</div>
+              <h3>Trust</h3>
+              <p>Payments, data, and integrations are built with security and verifiability at their core.</p>
             </div>
             <div className="value-card">
-              <div className="value-icon">💡</div>
-              <h3>Innovation</h3>
-              <p>We continuously innovate our teaching methods and course offerings.</p>
+              <div className="value-icon">🌐</div>
+              <h3>Accessibility</h3>
+              <p>We design for India's diversity — multiple languages, varying connectivity, and a wide range of devices.</p>
             </div>
             <div className="value-card">
-              <div className="value-icon">🌟</div>
-              <h3>Impact</h3>
-              <p>We measure our success by the impact we create in our students' lives.</p>
+              <div className="value-icon">⚙️</div>
+              <h3>Reliability</h3>
+              <p>Production-grade infrastructure with monitoring, clear APIs, and defined SLAs for partner integrations.</p>
             </div>
           </div>
         </div>

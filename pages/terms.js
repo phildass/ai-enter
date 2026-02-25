@@ -89,45 +89,42 @@ export default function Terms() {
         <div className="content">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using the AI Cloud Enterprises platform and enrolling in our courses, 
-            you agree to be bound by these Terms & Conditions. If you do not agree with any part 
+            By accessing and using AI Cloud Enterprises platforms and services — including IISkills, Jai Bharat, and Jai Kisan — 
+            you agree to be bound by these Terms &amp; Conditions. If you do not agree with any part 
             of these terms, you may not use our services.
           </p>
 
-          <h2>2. Course Enrollment and Payment</h2>
+          <h2>2. Service Enrollment and Payment</h2>
           <p>
-            When you enroll in a course, you agree to pay the applicable fees as displayed at the 
-            time of enrollment. All fees are in Indian Rupees (INR) and include applicable GST.
+            When you subscribe to or purchase access to any of our products or services, you agree to pay the applicable fees as displayed at the time of purchase. All fees are in Indian Rupees (INR) and include applicable GST.
           </p>
           <ul>
-            <li>Early Bird pricing: ₹99 + 18% GST (₹116.82 total) - valid until February 28, 2026</li>
-            <li>Regular pricing: ₹299 + 18% GST (₹352.82 total) - effective March 1, 2026</li>
-            <li>The Learn AI + Learn Developer combo is offered at the same price as Learn AI alone</li>
+            <li>Pricing is displayed at the time of purchase on the relevant product platform</li>
             <li>All payments are processed securely through Razorpay</li>
+            <li>Payment can only be initiated from the respective product platform (iiskills.cloud, jaibharat.cloud, or jaikisan.cloud)</li>
           </ul>
 
-          <h2>3. Course Access and Content</h2>
+          <h2>3. Service Access and Content</h2>
           <p>
-            Upon successful payment, you will receive access to your enrolled course(s). Course 
-            access and materials are provided for personal, non-commercial use only.
+            Upon successful payment, you will receive access to the product or service you have subscribed to. Access and materials are provided for personal, non-commercial use only.
           </p>
           <ul>
-            <li>You may not share your course access credentials with others</li>
-            <li>You may not reproduce, distribute, or sell course materials</li>
-            <li>We reserve the right to update course content at any time</li>
-            <li>Course access is provided for the duration specified in the course description</li>
+            <li>You may not share your access credentials with others</li>
+            <li>You may not reproduce, distribute, or sell content or materials provided through our services</li>
+            <li>We reserve the right to update service content at any time</li>
+            <li>Access is provided for the duration specified at the time of purchase</li>
           </ul>
 
           <h2>4. Refund Policy</h2>
           <p>
-            Due to the digital nature of our courses and immediate access upon purchase, 
+            Due to the digital nature of our services and immediate access upon purchase, 
             all sales are final. However, we may consider refund requests on a case-by-case 
-            basis within 7 days of enrollment if:
+            basis within 7 days of purchase if:
           </p>
           <ul>
-            <li>You have not accessed more than 10% of the course content</li>
-            <li>There are technical issues preventing course access that we cannot resolve</li>
-            <li>The course content significantly differs from what was advertised</li>
+            <li>You have not accessed more than 10% of the service content</li>
+            <li>There are technical issues preventing access that we cannot resolve</li>
+            <li>The service content significantly differs from what was advertised</li>
           </ul>
 
           <h2>5. User Conduct</h2>
@@ -142,15 +139,15 @@ export default function Terms() {
 
           <h2>6. Intellectual Property</h2>
           <p>
-            All course content, materials, trademarks, and other intellectual property on the 
-            AI Cloud Enterprises platform are owned by or licensed to us. You may not use our 
+            All content, materials, trademarks, and other intellectual property on AI Cloud Enterprises 
+            platforms are owned by or licensed to us. You may not use our 
             intellectual property without prior written permission.
           </p>
 
           <h2>7. Disclaimer of Warranties</h2>
           <p>
-            Our courses and platform are provided "as is" without warranties of any kind, either 
-            express or implied. We do not guarantee specific outcomes from taking our courses, 
+            Our services and platforms are provided "as is" without warranties of any kind, either 
+            express or implied. We do not guarantee specific outcomes from using our services, 
             and results may vary based on individual effort and circumstances.
           </p>
 
