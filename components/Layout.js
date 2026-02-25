@@ -1,13 +1,13 @@
 import Head from 'next/head';
 import Link from 'next/link';
 
-export default function Layout({ children, title = 'AI Cloud Enterprises - Smart SaaS Solutions' }) {
+export default function Layout({ children, title = 'AI Cloud Enterprises — Building Software Solutions for Public and Private Use', description = 'AI Cloud Enterprises is a corporate software company building AI-enabled platforms for education, public sector, agriculture, and citizen services across India.' }) {
   return (
     <>
       <Head>
         <title>{title}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="AI Cloud Enterprises - Smart SaaS Solutions for the Future" />
+        <meta name="description" content={description} />
         <link rel="icon" type="image/png" href="/images/aienter-favicon.png" />
         <link rel="apple-touch-icon" href="/images/aienter-favicon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -150,12 +150,11 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
           <ul>
             <li><Link href="/">Home</Link></li>
             <li><Link href="/about">About</Link></li>
+            <li><Link href="/solutions">Solutions</Link></li>
             <li><Link href="/contact">Contact</Link></li>
-            <li><Link href="/payments">Payment</Link></li>
-            <li><Link href="/register">Register</Link></li>
-            <li><Link href="/login">Login</Link></li>
+            <li><Link href="/payments">Payments</Link></li>
             <li><Link href="/privacy">Privacy Policy</Link></li>
-            <li><Link href="/terms">Terms & Conditions</Link></li>
+            <li><Link href="/terms">Terms &amp; Conditions</Link></li>
           </ul>
         </nav>
       </header>
@@ -164,6 +163,12 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Smart
 
       <footer>
         <p>&copy; 2026 AI Cloud Enterprises. All rights reserved.</p>
+        <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', opacity: 0.7 }}>
+          <Link href="/privacy" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', marginRight: '1.25rem' }}>Privacy Policy</Link>
+          <Link href="/terms" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', marginRight: '1.25rem' }}>Terms &amp; Conditions</Link>
+          <Link href="/contact" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', marginRight: '1.25rem' }}>Contact</Link>
+          <Link href="/payments" style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline' }}>Payments Portal</Link>
+        </p>
       </footer>
     </>
   );

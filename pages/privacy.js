@@ -89,9 +89,10 @@ export default function Privacy() {
         <div className="content">
           <h2>1. Introduction</h2>
           <p>
-            AI Cloud Enterprises ("we," "our," or "us") is committed to protecting your privacy. 
-            This Privacy Policy explains how we collect, use, disclose, and safeguard your information 
-            when you visit our website and enroll in our courses.
+            AI Cloud Enterprises ("we," "our," or "us") is committed to protecting your privacy.
+            This Privacy Policy explains how we collect, use, disclose, and safeguard your information
+            when you visit our website and use our products and services, including payments processed
+            through this gateway on behalf of IISkills, Jai Bharat, and Jai Kisan.
           </p>
 
           <h2>2. Information We Collect</h2>
@@ -99,16 +100,16 @@ export default function Privacy() {
           <ul>
             <li>Personal identification information (name, phone number, email address)</li>
             <li>Payment and billing information</li>
-            <li>Course enrollment and progress data</li>
+            <li>Service usage and access data</li>
             <li>Communications you send to us</li>
           </ul>
 
           <h2>3. How We Use Your Information</h2>
           <p>We use the information we collect to:</p>
           <ul>
-            <li>Process your course enrollments and payments</li>
-            <li>Provide and deliver the courses you have enrolled in</li>
-            <li>Send you updates, course materials, and administrative information</li>
+            <li>Process your payments and deliver the purchased services</li>
+            <li>Provide and maintain the products and services you have subscribed to</li>
+            <li>Send you updates, service materials, and administrative information</li>
             <li>Respond to your inquiries and provide customer support</li>
             <li>Improve our services and develop new offerings</li>
             <li>Comply with legal obligations</li>

@@ -89,45 +89,45 @@ export default function Terms() {
         <div className="content">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using the AI Cloud Enterprises platform and enrolling in our courses, 
-            you agree to be bound by these Terms & Conditions. If you do not agree with any part 
+            By accessing and using the AI Cloud Enterprises platform and its associated products and services,
+            you agree to be bound by these Terms &amp; Conditions. If you do not agree with any part
             of these terms, you may not use our services.
           </p>
 
-          <h2>2. Course Enrollment and Payment</h2>
+          <h2>2. Services and Payment</h2>
           <p>
-            When you enroll in a course, you agree to pay the applicable fees as displayed at the 
-            time of enrollment. All fees are in Indian Rupees (INR) and include applicable GST.
+            When you access a paid service or product offering through the AI Cloud Enterprises payment gateway,
+            you agree to pay the applicable fees as displayed at the time of purchase. All fees are in Indian
+            Rupees (INR) and include applicable GST.
           </p>
           <ul>
-            <li>Early Bird pricing: ₹99 + 18% GST (₹116.82 total) - valid until February 28, 2026</li>
-            <li>Regular pricing: ₹299 + 18% GST (₹352.82 total) - effective March 1, 2026</li>
-            <li>The Learn AI + Learn Developer combo is offered at the same price as Learn AI alone</li>
+            <li>Current pricing for each product is displayed on the respective payment page</li>
             <li>All payments are processed securely through Razorpay</li>
+            <li>AI Cloud Enterprises operates the payment gateway on behalf of its product brands: IISkills, Jai Bharat, and Jai Kisan</li>
           </ul>
 
-          <h2>3. Course Access and Content</h2>
+          <h2>3. Service Access and Content</h2>
           <p>
-            Upon successful payment, you will receive access to your enrolled course(s). Course 
-            access and materials are provided for personal, non-commercial use only.
+            Upon successful payment, you will receive access to the purchased service or product. Access and
+            associated materials are provided for personal, non-commercial use only.
           </p>
           <ul>
-            <li>You may not share your course access credentials with others</li>
-            <li>You may not reproduce, distribute, or sell course materials</li>
-            <li>We reserve the right to update course content at any time</li>
-            <li>Course access is provided for the duration specified in the course description</li>
+            <li>You may not share your access credentials with others</li>
+            <li>You may not reproduce, distribute, or sell materials provided as part of the service</li>
+            <li>We reserve the right to update service content at any time</li>
+            <li>Service access is provided for the duration specified at the time of purchase</li>
           </ul>
 
           <h2>4. Refund Policy</h2>
           <p>
-            Due to the digital nature of our courses and immediate access upon purchase, 
-            all sales are final. However, we may consider refund requests on a case-by-case 
-            basis within 7 days of enrollment if:
+            Due to the digital nature of our services and immediate access upon purchase,
+            all sales are generally final. However, we may consider refund requests on a case-by-case
+            basis within 7 days of purchase if:
           </p>
           <ul>
-            <li>You have not accessed more than 10% of the course content</li>
-            <li>There are technical issues preventing course access that we cannot resolve</li>
-            <li>The course content significantly differs from what was advertised</li>
+            <li>You have not accessed more than 10% of the service or content</li>
+            <li>There are technical issues preventing access that we cannot resolve</li>
+            <li>The service content significantly differs from what was advertised</li>
           </ul>
 
           <h2>5. User Conduct</h2>

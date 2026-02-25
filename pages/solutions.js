@@ -179,7 +179,7 @@ export default function Solutions() {
           margin-bottom: 2rem;
         }
 
-        .btn {
+        :global(.btn) {
           display: inline-block;
           padding: 1.2rem 3rem;
           font-size: 1.1rem;
@@ -193,7 +193,7 @@ export default function Solutions() {
           box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:hover {
+        :global(.btn:hover) {
           transform: translateY(-3px);
           box-shadow: 0 12px 35px rgba(102, 126, 234, 0.5);
         }
