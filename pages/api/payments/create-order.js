@@ -92,6 +92,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Order creation error:', error);
-    return res.status(500).json({ error: 'Failed to create order' });
+    return res.status(500).json({ error: 'Unable to process payment. Please try again.' });
   }
 }

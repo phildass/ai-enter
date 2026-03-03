@@ -4,7 +4,7 @@ export default function IisSkillsPay() {
   return (
     <SegmentPaymentPage
       segmentKey="iiskills"
-      brandName="IIS Skills"
+      brandName="iiskills"
       emoji="🎓"
       bgGradient="linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)"
       iconBg="#ede9fe"
@@ -21,7 +21,7 @@ export default function IisSkillsPay() {
         'No recurring fees',
       ]}
       originDomain="iiskills.cloud"
-      description="1-Year Access - IIS Skills Learning"
+      description="1-Year Access - iiskills Learning"
     />
   );
 }

@@ -69,7 +69,8 @@ export default function SegmentPaymentPage({
       const orderData = await orderResponse.json();
 
       if (!orderResponse.ok) {
-        throw new Error(orderData.error || 'Failed to create order');
+        console.error('Order creation error:', orderData.error);
+        throw new Error('Payment could not be initiated. Please try again.');
       }
 
       const script = document.createElement('script');
