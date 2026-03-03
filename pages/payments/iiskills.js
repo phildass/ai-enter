@@ -1,5 +1,7 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
 
+const IISKILLS_COURSES = ['learn-ai', 'learn-developer', 'learn-pr', 'learn-management'];
+
 export default function IisSkillsPay() {
   return (
     <SegmentPaymentPage
@@ -22,6 +24,7 @@ export default function IisSkillsPay() {
       ]}
       originDomain="iiskills.cloud"
       description="1-Year Access - iiskills Learning"
+      allowedCourses={IISKILLS_COURSES}
     />
   );
 }
