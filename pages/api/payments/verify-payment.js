@@ -143,6 +143,8 @@ export default async function handler(req, res) {
               user_id: transaction?.user_id || null,
               user_email: transaction?.user_email || null,
               user_phone: transaction?.user_phone || null,
+              customer_name: transaction?.customer_name || null,
+              course: transaction?.course || null,
               amount_paise: Math.round((transaction?.amount || 116.82) * 100),
               validity_days: transaction?.validity_days || 30,
               razorpay_order_id,
@@ -165,6 +167,13 @@ export default async function handler(req, res) {
               body: rawBody,
             });
             const webhookData = await webhookRes.json().catch(() => ({}));
+
+            if (!webhookRes.ok) {
+              console.error(
+                `[verify-payment] Webhook to ${webhookUrl} failed (HTTP ${webhookRes.status}):`,
+                webhookData,
+              );
+            }
 
             await supabase
               .from('payment_transactions')

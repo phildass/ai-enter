@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let user_id, app_name, user_email, user_phone, session_id, amount_paise, currency, validity_days, return_url, course;
+  let user_id, app_name, user_email, user_phone, customer_name, session_id, amount_paise, currency, validity_days, return_url, course;
 
   if (req.body.session_token) {
     // Token-based flow (jai-bharat, jai-kisan)
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     return_url = payload.return_url;
   } else {
     // Legacy flow (iiskills and direct API callers)
-    ({ user_id, app_name, user_email, course } = req.body);
+    ({ user_id, app_name, user_email, user_phone, customer_name, course } = req.body);
     if (course && typeof course !== 'string') {
       return res.status(400).json({ error: 'Invalid course value' });
     }
@@ -59,6 +59,8 @@ export default async function handler(req, res) {
         app_name,
         session_id,
         user_email: user_email || '',
+        user_phone: user_phone || '',
+        customer_name: customer_name || '',
         course: course || undefined,
       },
     });
@@ -75,6 +77,7 @@ export default async function handler(req, res) {
           user_id: user_id || null,
           user_email: user_email || null,
           user_phone: user_phone || null,
+          customer_name: customer_name || null,
           app_name,
           session_id,
           razorpay_order_id: order.id,
