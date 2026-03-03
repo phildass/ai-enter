@@ -1,10 +1,28 @@
 import Head from 'next/head';
 import Link from 'next/link';
 
+const VALID_COURSES = [
+  'learn-chemistry', 'learn-geography', 'learn-math', 'learn-physics',
+  'learn-apt', 'learn-pr', 'learn-ai', 'learn-management',
+  'learn-developer', 'learn-ai-developer-combo',
+];
+
+export async function getServerSideProps({ query }) {
+  if (query.course && VALID_COURSES.includes(query.course)) {
+    return {
+      redirect: {
+        destination: `/payments/iiskills?course=${encodeURIComponent(query.course)}`,
+        permanent: false,
+      },
+    };
+  }
+  return { props: {} };
+}
+
 const segments = [
   {
     key: 'iiskills',
-    name: 'IIS Skills',
+    name: 'iiskills',
     domain: 'iiskills.cloud',
     emoji: '🎓',
     color: '#7c3aed',
