@@ -14,7 +14,7 @@
 module.exports = {
   apps: [
     {
-      name: "aienter",
+      name: "ai-enter",
       cwd: "/var/www/ai-enter",
       script: "npm",
       args: "start",

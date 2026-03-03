@@ -99,14 +99,12 @@ if [ -d "$APP_DIR" ]; then
 fi
 mv "$NEW_DIR" "$APP_DIR"
 
-# Start/restart PM2 with correct env + cwd
+# Start/restart PM2 with correct env + cwd via ecosystem.config.js
 log "Starting PM2 app: $APP_NAME (PORT=$PORT)"
 cd "$APP_DIR"
-if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-  PORT="$PORT" pm2 restart "$APP_NAME" --update-env
-else
-  PORT="$PORT" pm2 start yarn --name "$APP_NAME" -- start
-fi
+# Delete any existing entry so the ecosystem config (cwd, PORT) is applied cleanly
+pm2 delete "$APP_NAME" 2>/dev/null || true
+pm2 start ecosystem.config.js
 pm2 save
 
 # Health check
