@@ -151,15 +151,18 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- User identification
-  user_id UUID NOT NULL,
+  user_id UUID,
   user_email TEXT,
   user_phone TEXT,
 
   -- App identification
-  app_name TEXT NOT NULL, -- 'jai-kisan' or 'jai-bharat'
+  app_name TEXT NOT NULL, -- 'iiskills', 'jai-kisan', or 'jai-bharat'
 
   -- Handoff session tracking
   session_id TEXT,
+
+  -- Course selected at payment time (iiskills segment)
+  course TEXT,
 
   -- Payment details
   razorpay_order_id TEXT NOT NULL,
@@ -203,6 +206,10 @@ ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS validity_days INTEGER 
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS return_url TEXT;
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE payment_transactions ALTER COLUMN webhook_sent_at TYPE TIMESTAMP WITH TIME ZONE;
+-- Allow anonymous iiskills payments where user_id may not be known
+ALTER TABLE payment_transactions ALTER COLUMN user_id DROP NOT NULL;
+-- Track which course was selected during payment (iiskills segment)
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS course TEXT;
 
 -- Unique index on session_id, ignoring NULL values (safe for existing rows with NULL session_id)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_session_id_unique

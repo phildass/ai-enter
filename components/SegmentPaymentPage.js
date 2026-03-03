@@ -20,7 +20,17 @@ import Head from 'next/head';
  *   - features: string[] of feature bullet points
  *   - originDomain: e.g. 'iiskills.cloud' for the invalid-link message
  *   - description: Razorpay checkout description string
+ *   - allowedCourses: string[] - if set, enables course-based entry (no user_id required);
+ *       a dropdown is shown so the user can select a course if not provided in the URL.
  */
+
+const COURSE_LABELS = {
+  'learn-ai': 'Learn AI',
+  'learn-developer': 'Learn Developer',
+  'learn-pr': 'Learn PR',
+  'learn-management': 'Learn Management',
+};
+
 export default function SegmentPaymentPage({
   segmentKey,
   brandName,
@@ -39,6 +49,7 @@ export default function SegmentPaymentPage({
   tokenPayload,
   rawToken,
   tokenError,
+  allowedCourses,
 }) {
   const router = useRouter();
 
@@ -47,6 +58,12 @@ export default function SegmentPaymentPage({
   const user_id = tokenPayload ? tokenPayload.user_id : router.query.user_id;
   const email = tokenPayload ? tokenPayload.user_email : router.query.email;
 
+  // Course selection for course-based segments (e.g. iiskills).
+  // Prefers query param; falls back to dropdown selection via state.
+  const [selectedCourse, setSelectedCourse] = useState('');
+  const queryCourse = router.isReady ? router.query.course : undefined;
+  const course = allowedCourses ? (queryCourse || selectedCourse || '') : null;
+  const isCourseValid = !allowedCourses || allowedCourses.includes(course);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -58,7 +75,7 @@ export default function SegmentPaymentPage({
     try {
       const orderBody = rawToken
         ? { session_token: rawToken }
-        : { user_id, app_name: segmentKey, user_email: email || '' };
+        : { user_id, app_name: segmentKey, user_email: email || '', course: course || undefined };
 
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
@@ -100,6 +117,7 @@ export default function SegmentPaymentPage({
                   razorpay_signature: response.razorpay_signature,
                   user_id,
                   app_name: segmentKey,
+                  course: course || undefined,
                 };
 
             const verifyResponse = await fetch('/api/payments/verify-payment', {
@@ -150,9 +168,11 @@ export default function SegmentPaymentPage({
   };
 
 
+  // For token-based segments (jaibharat, jaikisan): show error if token is missing/invalid.
+  // For course-based segments (iiskills): skip the user_id check; course validity governs rendering.
   const shouldShowError =
     tokenError ||
-    (!tokenPayload && !user_id && typeof window !== 'undefined' && router.isReady);
+    (!tokenPayload && !user_id && !allowedCourses && typeof window !== 'undefined' && router.isReady);
 
   if (shouldShowError) {
 
@@ -211,6 +231,39 @@ export default function SegmentPaymentPage({
             <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Complete Your Payment</p>
           </div>
 
+          {/* Course dropdown (shown for course-based segments like iiskills) */}
+          {allowedCourses && router.isReady && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Select your course:
+              </p>
+              <select
+                value={course}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: '8px',
+                  border: `1px solid ${isCourseValid ? '#d1d5db' : '#f87171'}`,
+                  fontSize: '0.95rem',
+                  color: '#374151',
+                  background: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">-- Select a course --</option>
+                {allowedCourses.map((c) => (
+                  <option key={c} value={c}>{COURSE_LABELS[c] || c}</option>
+                ))}
+              </select>
+              {!isCourseValid && course === '' && (
+                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
+                  Please select a course to continue.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Pricing Box */}
           <div style={{
             background: accentGradient,
@@ -244,17 +297,17 @@ export default function SegmentPaymentPage({
           {/* Pay Button */}
           <button
             onClick={handlePayment}
-            disabled={loading}
+            disabled={loading || !isCourseValid}
             style={{
               width: '100%',
-              background: loading ? accentDisabled : accentColor,
+              background: (loading || !isCourseValid) ? accentDisabled : accentColor,
               color: 'white',
               border: 'none',
               borderRadius: '12px',
               padding: '1rem',
               fontSize: '1.1rem',
               fontWeight: '700',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: (loading || !isCourseValid) ? 'not-allowed' : 'pointer',
               marginBottom: '1rem',
               transition: 'background 0.2s',
             }}

@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let user_id, app_name, user_email, user_phone, session_id, amount_paise, currency, validity_days, return_url;
+  let user_id, app_name, user_email, user_phone, session_id, amount_paise, currency, validity_days, return_url, course;
 
   if (req.body.session_token) {
     // Token-based flow (jai-bharat, jai-kisan)
@@ -30,7 +30,14 @@ export default async function handler(req, res) {
     return_url = payload.return_url;
   } else {
     // Legacy flow (iiskills and direct API callers)
-    ({ user_id, app_name, user_email } = req.body);
+    ({ user_id, app_name, user_email, course } = req.body);
+    if (course && typeof course !== 'string') {
+      return res.status(400).json({ error: 'Invalid course value' });
+    }
+    const ALLOWED_COURSES = ['learn-ai', 'learn-developer', 'learn-pr', 'learn-management'];
+    if (course && !ALLOWED_COURSES.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course. Must be one of: ' + ALLOWED_COURSES.join(', ') });
+    }
   }
 
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -46,12 +53,13 @@ export default async function handler(req, res) {
     const order = await razorpay.orders.create({
       amount: amount_paise || 11682,
       currency: currency || 'INR',
-      receipt: `${app_name}_${session_id}`,
+      receipt: `${app_name}_${session_id || Date.now()}`.slice(0, 40),
       notes: {
         user_id,
         app_name,
         session_id,
         user_email: user_email || '',
+        course: course || undefined,
       },
     });
 
@@ -64,7 +72,7 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from('payment_transactions')
         .insert({
-          user_id,
+          user_id: user_id || null,
           user_email: user_email || null,
           user_phone: user_phone || null,
           app_name,
@@ -74,6 +82,7 @@ export default async function handler(req, res) {
           currency: currency || 'INR',
           validity_days: validity_days || 30,
           return_url: return_url || null,
+          course: course || null,
           status: 'pending',
         });
 
