@@ -76,7 +76,7 @@ pm2 stop "$APP_NAME" >/dev/null 2>&1 || true
 
 # Free the port if a stray node/next process is still holding it
 log "Ensuring port $PORT is free (only node/next processes will be killed)"
-PID_ON_PORT="$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p {print $0}' | sed -n 's/.*pid=\\([0-9]\\+\\).*/\\1/p' | head -n1 || true)"
+PID_ON_PORT="$(ss -ltnp 2>/dev/null | awk -v p=":$PORT" '$4 ~ p {print $0}' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | head -n1 || true)"
 if [ -n "${PID_ON_PORT:-}" ]; then
   CMDLINE="$(ps -p "$PID_ON_PORT" -o comm= -o args= 2>/dev/null || true)"
   if echo "$CMDLINE" | grep -Eqi '(node|next)'; then
