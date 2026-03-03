@@ -3,7 +3,7 @@ import Head from 'next/head';
 
 const appDetails = {
   'iiskills': {
-    name: 'IIS Skills',
+    name: 'iiskills',
     emoji: '🎓',
     bgColor: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
     cardBg: '#ede9fe',
@@ -95,10 +95,10 @@ export default function PaymentSuccess() {
             textAlign: 'left',
           }}>
             <p style={{ fontSize: '0.85rem', fontWeight: '700', color: currentApp.titleColor, marginBottom: '0.5rem' }}>
-              ⏰ Next Step: Enter OTP
+              ⏰ Next Step: Activate Access
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              You will receive an OTP within 5 minutes. Please check your app notifications and enter it to activate your subscription.
+              Your access is being activated. If an OTP was sent, please check your SMS messages and enter it in the app to complete activation.
             </p>
           </div>
 

@@ -154,6 +154,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   user_id UUID,
   user_email TEXT,
   user_phone TEXT,
+  customer_name TEXT,
 
   -- App identification
   app_name TEXT NOT NULL, -- 'iiskills', 'jai-kisan', or 'jai-bharat'
@@ -210,6 +211,8 @@ ALTER TABLE payment_transactions ALTER COLUMN webhook_sent_at TYPE TIMESTAMP WIT
 ALTER TABLE payment_transactions ALTER COLUMN user_id DROP NOT NULL;
 -- Track which course was selected during payment (iiskills segment)
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS course TEXT;
+-- Customer name for iiskills phone-only flow
+ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS customer_name TEXT;
 
 -- Unique index on session_id, ignoring NULL values (safe for existing rows with NULL session_id)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_session_id_unique

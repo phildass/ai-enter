@@ -31,6 +31,8 @@ const COURSE_LABELS = {
   'learn-management': 'Learn Management',
 };
 
+const PHONE_REGEX = /^\d{10}$/;
+
 export default function SegmentPaymentPage({
   segmentKey,
   brandName,
@@ -67,6 +69,12 @@ export default function SegmentPaymentPage({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+
+  // For iiskills (course-based), require name and phone
+  const isNamePhoneValid = !allowedCourses || (firstName.trim() && lastName.trim() && PHONE_REGEX.test(phone.trim()));
 
   const handlePayment = async () => {
     setLoading(true);
@@ -75,7 +83,14 @@ export default function SegmentPaymentPage({
     try {
       const orderBody = rawToken
         ? { session_token: rawToken }
-        : { user_id, app_name: segmentKey, user_email: email || '', course: course || undefined };
+        : {
+            user_id,
+            app_name: segmentKey,
+            user_email: email || '',
+            customer_name: allowedCourses ? `${firstName.trim()} ${lastName.trim()}` : undefined,
+            user_phone: allowedCourses ? phone.trim() : undefined,
+            course: course || undefined,
+          };
 
       const orderResponse = await fetch('/api/payments/create-order', {
         method: 'POST',
@@ -264,6 +279,70 @@ export default function SegmentPaymentPage({
             </div>
           )}
 
+          {/* Name and Phone fields (shown for course-based segments like iiskills) */}
+          {allowedCourses && router.isReady && (
+            <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>First Name *</p>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.9rem',
+                      color: '#374151',
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>Last Name *</p>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: '8px',
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.9rem',
+                      color: '#374151',
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>Phone Number * (10 digits)</p>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="10-digit mobile number"
+                  style={{
+                    width: '100%',
+                    padding: '0.65rem',
+                    borderRadius: '8px',
+                    border: `1px solid ${phone && !PHONE_REGEX.test(phone) ? '#f87171' : '#d1d5db'}`,
+                    fontSize: '0.9rem',
+                    color: '#374151',
+                  }}
+                />
+                {phone && !PHONE_REGEX.test(phone) && (
+                  <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>
+                    Please enter a valid 10-digit phone number.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Pricing Box */}
           <div style={{
             background: accentGradient,
@@ -297,17 +376,17 @@ export default function SegmentPaymentPage({
           {/* Pay Button */}
           <button
             onClick={handlePayment}
-            disabled={loading || !isCourseValid}
+            disabled={loading || !isCourseValid || !isNamePhoneValid}
             style={{
               width: '100%',
-              background: (loading || !isCourseValid) ? accentDisabled : accentColor,
+              background: (loading || !isCourseValid || !isNamePhoneValid) ? accentDisabled : accentColor,
               color: 'white',
               border: 'none',
               borderRadius: '12px',
               padding: '1rem',
               fontSize: '1.1rem',
               fontWeight: '700',
-              cursor: (loading || !isCourseValid) ? 'not-allowed' : 'pointer',
+              cursor: (loading || !isCourseValid || !isNamePhoneValid) ? 'not-allowed' : 'pointer',
               marginBottom: '1rem',
               transition: 'background 0.2s',
             }}
