@@ -17,7 +17,7 @@ APP_DIR="/var/www/ai-enter"
 REPO_URL="https://github.com/phildass/ai-enter.git"
 BRANCH="main"
 PM2_NAME="ai-enter"
-PORT="3010"
+PORT="3040"
 
 # Backups (optional but recommended)
 BACKUP_DIR="/var/backups/ai-enter"
@@ -101,14 +101,10 @@ log "Building"
 yarn build
 
 # ---- PM2 restart/start ---------------------------------------
-log "Restarting/starting PM2 process"
-if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
-  # Update environment variables (incl PORT) on restart
-  PORT="$PORT" pm2 restart "$PM2_NAME" --update-env
-else
-  # Start Next.js via yarn start
-  PORT="$PORT" pm2 start yarn --name "$PM2_NAME" -- start
-fi
+log "Restarting/starting PM2 process via ecosystem.config.js"
+# Delete any existing entry so the ecosystem config (cwd, PORT) is applied cleanly
+pm2 delete "$PM2_NAME" 2>/dev/null || true
+pm2 start ecosystem.config.js
 
 pm2 save
 

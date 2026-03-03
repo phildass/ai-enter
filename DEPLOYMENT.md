@@ -97,7 +97,7 @@ The application includes a PM2 ecosystem configuration file. Start the applicati
 pm2 start ecosystem.config.js
 
 # OR start directly (will use port 3040 as configured in package.json)
-pm2 start npm --name "aienter" -- start
+pm2 start npm --name "ai-enter" -- start
 
 # Save PM2 configuration
 pm2 save
@@ -181,7 +181,7 @@ After deployment, verify everything is working:
 pm2 status
 
 # View application logs
-pm2 logs aienter --lines 50
+pm2 logs ai-enter --lines 50
 
 # Check if port 3040 is in use
 sudo lsof -i :3040
@@ -231,10 +231,10 @@ curl -I http://aienter.in
 pm2 status
 
 # Restart the application
-pm2 restart aienter
+pm2 restart ai-enter
 
 # Check logs for errors
-pm2 logs aienter --err
+pm2 logs ai-enter --err
 ```
 
 ### Issue: 502 Bad Gateway from Nginx
@@ -245,10 +245,10 @@ pm2 logs aienter --err
 sudo lsof -i :3040
 
 # Check PM2 logs
-pm2 logs aienter
+pm2 logs ai-enter
 
 # Restart both services
-pm2 restart aienter
+pm2 restart ai-enter
 sudo systemctl reload nginx
 ```
 
@@ -275,7 +275,7 @@ npm run build
 cat .env
 
 # Restart PM2 to reload environment
-pm2 restart aienter
+pm2 restart ai-enter
 ```
 
 ## Updating the Application
@@ -296,10 +296,10 @@ npm install
 npm run build
 
 # Restart PM2
-pm2 restart aienter
+pm2 restart ai-enter
 
 # Monitor logs for any issues
-pm2 logs aienter
+pm2 logs ai-enter
 ```
 
 ## Monitoring
@@ -311,11 +311,11 @@ pm2 logs aienter
 pm2 monit
 
 # View logs
-pm2 logs aienter
+pm2 logs ai-enter
 
 # View specific log file
-pm2 logs aienter --out  # stdout only
-pm2 logs aienter --err  # stderr only
+pm2 logs ai-enter --out  # stdout only
+pm2 logs ai-enter --err  # stderr only
 ```
 
 ### System Resources
@@ -354,7 +354,7 @@ top
 For deployment issues:
 
 1. Check this guide's troubleshooting section
-2. Review PM2 logs: `pm2 logs aienter`
+2. Review PM2 logs: `pm2 logs ai-enter`
 3. Review Nginx logs: `sudo tail -f /var/log/nginx/error.log`
 4. Verify all environment variables are set correctly
 5. Ensure server has adequate resources (RAM, disk space)
@@ -364,9 +364,9 @@ For deployment issues:
 ```bash
 # Application Management
 pm2 start ecosystem.config.js    # Start app
-pm2 stop aienter                  # Stop app
-pm2 restart aienter               # Restart app
-pm2 logs aienter                  # View logs
+pm2 stop ai-enter                  # Stop app
+pm2 restart ai-enter               # Restart app
+pm2 logs ai-enter                  # View logs
 pm2 monit                         # Monitor resources
 
 # Nginx Management
@@ -380,7 +380,7 @@ cd /var/www/ai-enter
 git pull
 npm install
 npm run build
-pm2 restart aienter
+pm2 restart ai-enter
 ```
 
 ## Port Configuration
