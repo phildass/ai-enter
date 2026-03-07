@@ -95,10 +95,10 @@ export default function PaymentSuccess() {
             textAlign: 'left',
           }}>
             <p style={{ fontSize: '0.85rem', fontWeight: '700', color: currentApp.titleColor, marginBottom: '0.5rem' }}>
-              ⏰ Next Step: Activate Access
+              ⏰ Next Step: Access Your Course
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              Your access is being activated. If an OTP was sent, please check your SMS messages and enter it in the app to complete activation.
+              Your access is being activated automatically. Please return to the app to access your course.
             </p>
           </div>
 
