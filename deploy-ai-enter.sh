@@ -20,16 +20,43 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
+# --- Requirements (be explicit so failures are obvious) ---
 require_cmd git
 require_cmd pm2
 require_cmd tar
+require_cmd rsync
+require_cmd yarn
+require_cmd curl
+require_cmd ss
+require_cmd awk
+require_cmd sed
 
 log "Deploying $APP_NAME: branch=$BRANCH pm2=$APP_NAME port=$PORT"
 
-# Safety: never run inside the app dir (prevents accidental self-deletes)
-CWD="$(pwd)"
-if [[ "$CWD" == "$APP_DIR"* ]] || [[ "$CWD" == "$NEW_DIR"* ]]; then
-  fail "Run this script from outside $APP_DIR (example: cd / && /root/deploy-ai-enter.sh)"
+# --- Self-relocation: allow running from anywhere (including inside APP_DIR) ---
+# If we are executing from inside APP_DIR or NEW_DIR, re-run from /tmp so the script
+# itself is not affected by directory swaps.
+SCRIPT_PATH="$(python3 - <<'PY' 2>/dev/null || true
+import os,sys
+print(os.path.realpath(sys.argv[1]))
+PY
+"$0")"
+
+# Fallback if python3 isn't available
+if [ -z "${SCRIPT_PATH:-}" ]; then
+  SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || echo "$0")"
+fi
+
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+
+# If script is located under APP_DIR or NEW_DIR, copy to /tmp and exec it from there
+if [[ "$SCRIPT_PATH" == "$APP_DIR"* ]] || [[ "$SCRIPT_PATH" == "$NEW_DIR"* ]]; then
+  TS_REEXEC="$(date +%s)"
+  TMP_SCRIPT="/tmp/deploy-${APP_NAME}-${TS_REEXEC}.sh"
+  log "Script is inside $APP_DIR or $NEW_DIR; copying to $TMP_SCRIPT and re-executing from /tmp"
+  cp -f "$SCRIPT_PATH" "$TMP_SCRIPT"
+  chmod +x "$TMP_SCRIPT"
+  exec "$TMP_SCRIPT"
 fi
 
 mkdir -p "$BACKUP_DIR"
@@ -41,7 +68,6 @@ ROLLBACK_DIR="$BACKUP_DIR/${APP_NAME}-${TS}"
 if [ -d "$APP_DIR" ]; then
   log "Creating rollback copy: $APP_DIR -> $ROLLBACK_DIR"
   mkdir -p "$ROLLBACK_DIR"
-  # Copy current app excluding heavy/runtime dirs
   rsync -a --delete \
     --exclude ".git" \
     --exclude "node_modules" \
@@ -83,7 +109,6 @@ if [ -n "${PID_ON_PORT:-}" ]; then
     log "Killing stray process on $PORT (pid=$PID_ON_PORT): $CMDLINE"
     kill "$PID_ON_PORT" >/dev/null 2>&1 || true
     sleep 0.5
-    # If still listening, force kill
     if ss -ltnp 2>/dev/null | grep -q ":$PORT"; then
       kill -9 "$PID_ON_PORT" >/dev/null 2>&1 || true
     fi
@@ -102,7 +127,6 @@ mv "$NEW_DIR" "$APP_DIR"
 # Start/restart PM2 with correct env + cwd via ecosystem.config.js
 log "Starting PM2 app: $APP_NAME (PORT=$PORT)"
 cd "$APP_DIR"
-# Delete any existing entry so the ecosystem config (cwd, PORT) is applied cleanly
 pm2 delete "$APP_NAME" 2>/dev/null || true
 pm2 start ecosystem.config.js
 pm2 save
@@ -122,12 +146,9 @@ fi
 
 log "Health check OK"
 
-# Cleanup old swapped dir (keep for quick manual rollback for a bit, optional)
-OLD_DIR_GLOB="${APP_DIR}.old-"
 log "Pruning old swapped directories older than 2 days"
 find /var/www -maxdepth 1 -type d -name "ai-enter.old-*" -mtime +2 -exec rm -rf {} \; >/dev/null 2>&1 || true
 
-# Prune backups
 log "Pruning backups (keep last $KEEP_BACKUPS)"
 ls -1dt "$BACKUP_DIR/${APP_NAME}-"* 2>/dev/null | tail -n +"$((KEEP_BACKUPS+1))" | xargs -r rm -rf || true
 
