@@ -90,7 +90,10 @@ export default async function handler(req, res) {
         });
 
       if (error) {
-        console.error('Supabase insert error:', error);
+        // Non-fatal: payment_transactions table may not exist yet, or a column may
+        // differ from the schema.  The Razorpay order is already created so we
+        // continue and return a successful response to the client.
+        console.error('[create-order] Supabase insert into payment_transactions failed (non-fatal):', error.message);
       }
     }
 

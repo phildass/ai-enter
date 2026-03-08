@@ -24,6 +24,31 @@ import Head from 'next/head';
  *       a dropdown is shown so the user can select a course if not provided in the URL.
  */
 
+/**
+ * Returns the API base URL from the NEXT_PUBLIC_API_BASE_URL env var.
+ * Defaults to '' (empty string) so that all fetch calls use same-origin
+ * relative paths when no explicit base is configured.
+ * Set NEXT_PUBLIC_API_BASE_URL to an absolute URL (e.g. https://api.aienter.in)
+ * when the Next.js API routes are deployed on a separate host.
+ */
+function getApiBase() {
+  return (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+}
+
+const FETCH_TIMEOUT_MS = 30000; // 30 seconds – fail fast instead of hanging
+
+/**
+ * Wrapper around fetch that rejects after FETCH_TIMEOUT_MS milliseconds,
+ * surfacing a user-visible error rather than spinning forever.
+ */
+function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  );
+}
+
 const COURSE_LABELS = {
   'learn-ai': 'Learn AI',
   'learn-developer': 'Learn Developer',
@@ -68,6 +93,7 @@ export default function SegmentPaymentPage({
   const isCourseValid = !allowedCourses || allowedCourses.includes(course);
 
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -78,7 +104,10 @@ export default function SegmentPaymentPage({
 
   const handlePayment = async () => {
     setLoading(true);
+    setLoadingStatus('Creating order…');
     setError('');
+
+    const apiBase = getApiBase();
 
     try {
       const orderBody = rawToken
@@ -92,25 +121,52 @@ export default function SegmentPaymentPage({
             course: course || undefined,
           };
 
-      const orderResponse = await fetch('/api/payments/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderBody),
-      });
+      console.log('[payment] Creating order for app:', segmentKey);
+      let orderResponse;
+      try {
+        orderResponse = await fetchWithTimeout(`${apiBase}/api/payments/create-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderBody),
+        });
+      } catch (fetchErr) {
+        if (fetchErr.name === 'AbortError') {
+          throw new Error('Order creation timed out. Please check your connection and try again.');
+        }
+        throw new Error('Could not reach the payment server. Please check your connection and try again.');
+      }
 
       const orderData = await orderResponse.json();
 
       if (!orderResponse.ok) {
-        console.error('Order creation error:', orderData.error);
-        throw new Error('Payment could not be initiated. Please try again.');
+        console.error('[payment] Order creation failed:', orderData.error);
+        throw new Error(orderData.error || 'Payment could not be initiated. Please try again.');
       }
+      console.log('[payment] Order created:', orderData.orderId);
+
+      setLoadingStatus('Loading payment gateway…');
 
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
       script.async = true;
       document.body.appendChild(script);
 
+      // Fail fast if the Razorpay SDK does not load within 15 seconds.
+      const scriptLoadTimeout = setTimeout(() => {
+        console.error('[payment] Razorpay script load timed out');
+        if (script.parentNode) {
+          document.body.removeChild(script);
+        }
+        setError('Payment gateway took too long to load. Please refresh and try again.');
+        setLoading(false);
+        setLoadingStatus('');
+      }, 15000);
+
       script.onload = () => {
+        clearTimeout(scriptLoadTimeout);
+        console.log('[payment] Razorpay script loaded, opening checkout');
+        setLoadingStatus('Processing your payment…');
+
         const options = {
           key: orderData.keyId,
           amount: orderData.amount,
@@ -119,6 +175,9 @@ export default function SegmentPaymentPage({
           description,
           order_id: orderData.orderId,
           handler: async function (response) {
+            setLoadingStatus('Verifying payment…');
+            console.log('[payment] Razorpay payment received, verifying:', response.razorpay_payment_id);
+
             const verifyBody = rawToken
               ? {
                   razorpay_order_id: response.razorpay_order_id,
@@ -135,15 +194,30 @@ export default function SegmentPaymentPage({
                   course: course || undefined,
                 };
 
-            const verifyResponse = await fetch('/api/payments/verify-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(verifyBody),
-            });
+            let verifyResponse;
+            try {
+              verifyResponse = await fetchWithTimeout(`${apiBase}/api/payments/verify-payment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(verifyBody),
+              });
+            } catch (fetchErr) {
+              const msg =
+                fetchErr.name === 'AbortError'
+                  ? 'Payment verification timed out. Your payment may have succeeded — please contact support with your payment ID: ' + response.razorpay_payment_id
+                  : 'Could not reach the verification server. Your payment may have succeeded — please contact support with your payment ID: ' + response.razorpay_payment_id;
+              console.error('[payment] Verify fetch error:', fetchErr);
+              setError(msg);
+              setLoading(false);
+              setLoadingStatus('');
+              return;
+            }
 
             const verifyData = await verifyResponse.json();
 
             if (verifyData.success) {
+              console.log('[payment] Verification successful, redirecting');
+              setLoadingStatus('Redirecting…');
               // Redirect to origin's return_url with session_id and status
               const returnUrl = verifyData.return_url || orderData.return_url;
               if (returnUrl) {
@@ -153,13 +227,17 @@ export default function SegmentPaymentPage({
                 router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
               }
             } else {
-              setError('Payment verification failed. Please contact support.');
+              console.error('[payment] Verification failed:', verifyData);
+              setError('Payment verification failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
               setLoading(false);
+              setLoadingStatus('');
             }
           },
           modal: {
             ondismiss: function () {
+              console.log('[payment] Checkout modal dismissed');
               setLoading(false);
+              setLoadingStatus('');
             },
           },
           theme: {
@@ -172,13 +250,17 @@ export default function SegmentPaymentPage({
       };
 
       script.onerror = () => {
+        clearTimeout(scriptLoadTimeout);
+        console.error('[payment] Failed to load Razorpay script');
         setError('Failed to load payment gateway. Please try again.');
         setLoading(false);
+        setLoadingStatus('');
       };
     } catch (err) {
-      console.error('Payment error:', err);
+      console.error('[payment] Unexpected error:', err);
       setError(err.message || 'Payment failed. Please try again.');
       setLoading(false);
+      setLoadingStatus('');
     }
   };
 
@@ -391,7 +473,7 @@ export default function SegmentPaymentPage({
               transition: 'background 0.2s',
             }}
           >
-            {loading ? 'Processing...' : 'Pay ₹116.82'}
+            {loading ? (loadingStatus || 'Processing…') : 'Pay ₹116.82'}
           </button>
 
           {error && (

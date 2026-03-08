@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         const payment = await razorpay.payments.fetch(razorpay_payment_id);
         paymentMethod = payment.method;
       } catch (err) {
-        console.error('Failed to fetch payment details:', err);
+        console.error('[verify-payment] Failed to fetch payment details from Razorpay (non-fatal):', err.message);
       }
     }
 
@@ -117,7 +117,11 @@ export default async function handler(req, res) {
         .single();
 
       if (error) {
-        console.error('Supabase update error:', error);
+        // Non-fatal: payment_transactions table may not exist yet, or the row
+        // was never created (e.g. Supabase was not configured during order
+        // creation).  The signature is already verified above so we continue
+        // and return a successful response to the client.
+        console.error('[verify-payment] Supabase update on payment_transactions failed (non-fatal):', error.message);
       } else {
         transactionId = transaction?.id;
         transactionRecord = transaction;
