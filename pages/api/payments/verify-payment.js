@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   let user_id, app_name, webhookUrl;
 
   if (session_token) {
-    // Token-based flow (jai-bharat, jai-kisan): verify token and use its data
+    // Token-based flow (jai-bharat, jai-kisan, iiskills): verify token and use its data
     let payload;
     try {
       payload = verifyHandoffToken(session_token);
@@ -51,6 +51,8 @@ export default async function handler(req, res) {
     webhookUrl =
       app_name === 'jai-kisan'
         ? process.env.JAI_KISAN_WEBHOOK_URL
+        : app_name === 'iiskills'
+        ? process.env.IISKILLS_WEBHOOK_URL
         : process.env.JAI_BHARAT_WEBHOOK_URL;
   } else {
     // Legacy flow (iiskills and direct API callers)

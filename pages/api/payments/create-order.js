@@ -2,6 +2,7 @@ import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
+import { IISKILLS_ALLOWED_COURSES } from '../../../lib/courses';
 
 
 export default async function handler(req, res) {
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
   let user_id, app_name, user_email, user_phone, customer_name, session_id, amount_paise, currency, validity_days, return_url, course;
 
   if (req.body.session_token) {
-    // Token-based flow (jai-bharat, jai-kisan)
+    // Token-based flow (jai-bharat, jai-kisan, iiskills)
     let payload;
     try {
       payload = verifyHandoffToken(req.body.session_token);
@@ -28,15 +29,24 @@ export default async function handler(req, res) {
     currency = payload.currency;
     validity_days = payload.validity_days;
     return_url = payload.return_url;
+    // iiskills passes course alongside the token (course selected on the payment page)
+    if (req.body.course !== undefined) {
+      course = req.body.course;
+      if (course && typeof course !== 'string') {
+        return res.status(400).json({ error: 'Invalid course value' });
+      }
+      if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
+        return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
+      }
+    }
   } else {
     // Legacy flow (iiskills and direct API callers)
     ({ user_id, app_name, user_email, user_phone, customer_name, course } = req.body);
     if (course && typeof course !== 'string') {
       return res.status(400).json({ error: 'Invalid course value' });
     }
-    const ALLOWED_COURSES = ['learn-ai', 'learn-developer', 'learn-pr', 'learn-management'];
-    if (course && !ALLOWED_COURSES.includes(course)) {
-      return res.status(400).json({ error: 'Invalid course. Must be one of: ' + ALLOWED_COURSES.join(', ') });
+    if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
+      return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
     }
   }
 
