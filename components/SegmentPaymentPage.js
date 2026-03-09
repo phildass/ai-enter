@@ -99,27 +99,41 @@ export default function SegmentPaymentPage({
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
 
+  // Stores the Razorpay response when iiskills confirm failed so we can retry
+  const [confirmFailedData, setConfirmFailedData] = useState(null);
+
   // For iiskills (course-based), require name and phone
   const isNamePhoneValid = !allowedCourses || (firstName.trim() && lastName.trim() && PHONE_REGEX.test(phone.trim()));
+
+  // Whether this is the new iiskills JWT-based flow
+  const isIiskillsJwt = segmentKey === 'iiskills' && !!rawToken;
 
   const handlePayment = async () => {
     setLoading(true);
     setLoadingStatus('Creating order…');
     setError('');
+    setConfirmFailedData(null);
 
     const apiBase = getApiBase();
 
     try {
-      const orderBody = rawToken
-        ? { session_token: rawToken, ...(course ? { course } : {}) }
-        : {
-            user_id,
-            app_name: segmentKey,
-            user_email: email || '',
-            customer_name: allowedCourses ? `${firstName.trim()} ${lastName.trim()}` : undefined,
-            user_phone: allowedCourses ? phone.trim() : undefined,
-            course: course || undefined,
-          };
+      // Build create-order request body
+      let orderBody;
+      if (isIiskillsJwt) {
+        // New iiskills JWT flow: send the iiskills token directly
+        orderBody = { iiskills_token: rawToken };
+      } else if (rawToken) {
+        orderBody = { session_token: rawToken, ...(course ? { course } : {}) };
+      } else {
+        orderBody = {
+          user_id,
+          app_name: segmentKey,
+          user_email: email || '',
+          customer_name: allowedCourses ? `${firstName.trim()} ${lastName.trim()}` : undefined,
+          user_phone: allowedCourses ? phone.trim() : undefined,
+          course: course || undefined,
+        };
+      }
 
       console.log('[payment] Creating order for app:', segmentKey);
       let orderResponse;
@@ -178,60 +192,12 @@ export default function SegmentPaymentPage({
             setLoadingStatus('Verifying payment…');
             console.log('[payment] Razorpay payment received, verifying:', response.razorpay_payment_id);
 
-            const verifyBody = rawToken
-              ? {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  session_token: rawToken,
-                }
-              : {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  user_id,
-                  app_name: segmentKey,
-                  course: course || undefined,
-                };
-
-            let verifyResponse;
-            try {
-              verifyResponse = await fetchWithTimeout(`${apiBase}/api/payments/verify-payment`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(verifyBody),
-              });
-            } catch (fetchErr) {
-              const msg =
-                fetchErr.name === 'AbortError'
-                  ? 'Payment verification timed out. Your payment may have succeeded — please contact support with your payment ID: ' + response.razorpay_payment_id
-                  : 'Could not reach the verification server. Your payment may have succeeded — please contact support with your payment ID: ' + response.razorpay_payment_id;
-              console.error('[payment] Verify fetch error:', fetchErr);
-              setError(msg);
-              setLoading(false);
-              setLoadingStatus('');
-              return;
-            }
-
-            const verifyData = await verifyResponse.json();
-
-            if (verifyData.success) {
-              console.log('[payment] Verification successful, redirecting');
-              setLoadingStatus('Redirecting…');
-              // Redirect to origin's return_url with session_id and status
-              const returnUrl = verifyData.return_url || orderData.return_url;
-              if (returnUrl) {
-                const sep = returnUrl.includes('?') ? '&' : '?';
-                window.location.href = `${returnUrl}${sep}session_id=${encodeURIComponent(verifyData.session_id || orderData.session_id)}&status=success`;
-              } else {
-                router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
-              }
-            } else {
-              console.error('[payment] Verification failed:', verifyData);
-              setError('Payment verification failed. Please contact support with your payment ID: ' + response.razorpay_payment_id);
-              setLoading(false);
-              setLoadingStatus('');
-            }
+            await handleVerifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              orderData,
+            });
           },
           modal: {
             ondismiss: function () {
@@ -262,6 +228,108 @@ export default function SegmentPaymentPage({
       setLoading(false);
       setLoadingStatus('');
     }
+  };
+
+  /**
+   * Send the Razorpay payment details to our verify-payment API.
+   * For iiskills, the API will also call the iiskills-cloud confirm endpoint.
+   */
+  const handleVerifyPayment = async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData }) => {
+    const apiBase = getApiBase();
+
+    // Build verify body – iiskills uses the JWT token field, others use session_token
+    let verifyBody;
+    if (isIiskillsJwt) {
+      verifyBody = {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        iiskills_token: rawToken,
+      };
+    } else if (rawToken) {
+      verifyBody = {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        session_token: rawToken,
+      };
+    } else {
+      verifyBody = {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        user_id,
+        app_name: segmentKey,
+        course: course || undefined,
+      };
+    }
+
+    let verifyResponse;
+    try {
+      verifyResponse = await fetchWithTimeout(`${apiBase}/api/payments/verify-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(verifyBody),
+      });
+    } catch (fetchErr) {
+      const msg =
+        fetchErr.name === 'AbortError'
+          ? 'Payment verification timed out. Your payment may have succeeded — please contact support with your payment ID: ' + razorpay_payment_id
+          : 'Could not reach the verification server. Your payment may have succeeded — please contact support with your payment ID: ' + razorpay_payment_id;
+      console.error('[payment] Verify fetch error:', fetchErr);
+      setError(msg);
+      setLoading(false);
+      setLoadingStatus('');
+      return;
+    }
+
+    const verifyData = await verifyResponse.json();
+
+    if (verifyData.success && verifyData.confirmFailed) {
+      // iiskills: Razorpay payment captured but iiskills-cloud confirm failed
+      console.error('[payment] iiskills confirm failed:', verifyData.confirmError, 'purchaseId:', verifyData.purchaseId, 'paymentId:', razorpay_payment_id);
+      setConfirmFailedData({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData });
+      setError('Payment received but confirmation failed. Please use the button below to retry.');
+      setLoading(false);
+      setLoadingStatus('');
+      return;
+    }
+
+    if (verifyData.success) {
+      console.log('[payment] Verification successful, redirecting');
+      setLoadingStatus('Redirecting…');
+      // For iiskills: prefer redirect_url returned by iiskills-cloud confirm
+      const returnUrl =
+        verifyData.redirect_url ||
+        verifyData.return_url ||
+        (orderData && orderData.return_url);
+      if (returnUrl) {
+        const sep = returnUrl.includes('?') ? '&' : '?';
+        const sessionId = verifyData.session_id || (orderData && orderData.session_id);
+        window.location.href = sessionId
+          ? `${returnUrl}${sep}session_id=${encodeURIComponent(sessionId)}&status=success`
+          : `${returnUrl}${sep}status=success`;
+      } else {
+        router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+      }
+    } else {
+      console.error('[payment] Verification failed:', verifyData);
+      setError('Payment verification failed. Please contact support with your payment ID: ' + razorpay_payment_id);
+      setLoading(false);
+      setLoadingStatus('');
+    }
+  };
+
+  /**
+   * Retry the iiskills-cloud confirm call after a prior failure.
+   * Re-uses the stored Razorpay response so the payload is identical.
+   */
+  const handleRetryConfirm = async () => {
+    if (!confirmFailedData) return;
+    setLoading(true);
+    setLoadingStatus('Retrying confirmation…');
+    setError('');
+    await handleVerifyPayment(confirmFailedData);
   };
 
 
@@ -487,6 +555,26 @@ export default function SegmentPaymentPage({
               fontSize: '0.85rem',
             }}>
               {error}
+              {confirmFailedData && (
+                <button
+                  onClick={handleRetryConfirm}
+                  disabled={loading}
+                  style={{
+                    display: 'block',
+                    marginTop: '0.75rem',
+                    background: accentColor,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.5rem 1rem',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {loading ? (loadingStatus || 'Retrying…') : 'Retry Confirmation'}
+                </button>
+              )}
             </div>
           )}
 

@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start -p 3040",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node __tests__/iiskills.test.js"
   },
   "repository": {
     "type": "git",
