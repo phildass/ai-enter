@@ -82,7 +82,7 @@ export default function SegmentPaymentPage({
 
     try {
       const orderBody = rawToken
-        ? { session_token: rawToken }
+        ? { session_token: rawToken, ...(course ? { course } : {}) }
         : {
             user_id,
             app_name: segmentKey,
