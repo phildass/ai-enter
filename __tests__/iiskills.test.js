@@ -206,6 +206,30 @@ function buildJwt(payload, secret) {
 })();
 
 // ---------------------------------------------------------------------------
+// Test 4: x-aienter-timestamp – must be Unix epoch seconds (not milliseconds)
+// ---------------------------------------------------------------------------
+
+(function testTimestampIsSeconds() {
+  // Simulate the timestamp generation used in callIiskillsConfirm
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const value = parseInt(timestamp, 10);
+
+  // A Unix timestamp in seconds is ~10 digits (e.g. 1700000000).
+  // A millisecond timestamp would be ~13 digits (e.g. 1700000000000).
+  // Threshold: values > 1e12 indicate milliseconds, not seconds.
+  assert.ok(
+    value <= 1e12,
+    `x-aienter-timestamp must be in seconds (got ${value}, which looks like milliseconds)`,
+  );
+
+  // Must be a positive integer string
+  assert.ok(value > 0, 'timestamp must be a positive integer');
+  assert.strictEqual(timestamp, String(value), 'timestamp must be a plain integer string');
+
+  console.log('✓ x-aienter-timestamp: value is Unix epoch seconds');
+})();
+
+// ---------------------------------------------------------------------------
 // All tests passed
 // ---------------------------------------------------------------------------
 

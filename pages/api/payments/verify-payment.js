@@ -28,7 +28,7 @@ function computeConfirmSignature(rawBody) {
  * Endpoint: IISKILLS_CONFIRM_URL (default https://iiskills.cloud/api/payments/confirm)
  * Headers:
  *   x-aienter-signature  – HMAC-SHA256 over the raw request body
- *   x-aienter-timestamp  – Unix timestamp (ms) for replay-protection on iiskills side
+ *   x-aienter-timestamp  – Unix timestamp in seconds for replay-protection on iiskills side
  *
  * @returns {{ ok: boolean, redirectUrl: string|null, error: string|null }}
  */
@@ -37,7 +37,7 @@ async function callIiskillsConfirm(confirmPayload) {
     process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';
 
   const rawBody = JSON.stringify(confirmPayload);
-  const timestamp = Date.now().toString();
+  const timestamp = Math.floor(Date.now() / 1000).toString();
 
   let signature;
   try {
