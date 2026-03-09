@@ -3,9 +3,95 @@ import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 
 import { signWebhookPayload } from '../../../lib/handoff';
-
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
+import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
+import { IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 
+/**
+ * Compute the x-aienter-signature header value for the iiskills confirm request.
+ * Signature = HMAC-SHA256(rawBody, AIENTER_CONFIRMATION_SIGNING_SECRET) as hex.
+ *
+ * @param {string} rawBody  The exact JSON string being sent as the request body.
+ * @returns {string}        Hex-encoded HMAC-SHA256 signature.
+ */
+function computeConfirmSignature(rawBody) {
+  const secret = process.env.AIENTER_CONFIRMATION_SIGNING_SECRET;
+  if (!secret) {
+    throw new Error('AIENTER_CONFIRMATION_SIGNING_SECRET is not configured');
+  }
+  return crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+}
+
+/**
+ * POST the payment confirmation to iiskills-cloud.
+ *
+ * Endpoint: IISKILLS_CONFIRM_URL (default https://iiskills.cloud/api/payments/confirm)
+ * Headers:
+ *   x-aienter-signature  – HMAC-SHA256 over the raw request body
+ *   x-aienter-timestamp  – Unix timestamp (ms) for replay-protection on iiskills side
+ *
+ * @returns {{ ok: boolean, redirectUrl: string|null, error: string|null }}
+ */
+async function callIiskillsConfirm(confirmPayload) {
+  const confirmUrl =
+    process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';
+
+  const rawBody = JSON.stringify(confirmPayload);
+  const timestamp = Date.now().toString();
+
+  let signature;
+  try {
+    signature = computeConfirmSignature(rawBody);
+  } catch (err) {
+    return { ok: false, redirectUrl: null, error: err.message };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  let confirmRes;
+  try {
+    confirmRes = await fetch(confirmUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-aienter-signature': signature,
+        'x-aienter-timestamp': timestamp,
+      },
+      body: rawBody,
+      signal: controller.signal,
+    });
+  } catch (fetchErr) {
+    const msg =
+      fetchErr.name === 'AbortError'
+        ? 'iiskills confirm request timed out'
+        : `iiskills confirm network error: ${fetchErr.message}`;
+    return { ok: false, redirectUrl: null, error: msg };
+  } finally {
+    clearTimeout(timer);
+  }
+
+  let confirmData = {};
+  try {
+    confirmData = await confirmRes.json();
+  } catch {
+    // ignore parse errors
+  }
+
+  if (!confirmRes.ok) {
+    return {
+      ok: false,
+      redirectUrl: null,
+      error: `iiskills confirm returned HTTP ${confirmRes.status}`,
+    };
+  }
+
+  return {
+    ok: true,
+    redirectUrl: confirmData.redirect_url || null,
+    error: null,
+  };
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,10 +105,10 @@ export default async function handler(req, res) {
 
     session_id,
 
+    iiskills_token,
     session_token,
     user_id: bodyUserId,
     app_name: bodyAppName,
-
   } = req.body;
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -33,11 +119,22 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Payment system not configured' });
   }
 
-  // Resolve user_id, app_name, and webhook URL
+  // Resolve user_id, app_name, webhook URL, and iiskills-specific data
   let user_id, app_name, webhookUrl;
+  let iiskillsPayload = null; // set for new iiskills JWT flow
 
-  if (session_token) {
-    // Token-based flow (jai-bharat, jai-kisan, iiskills): verify token and use its data
+  if (iiskills_token) {
+    // New iiskills JWT flow: verify with IISKILLS_PAYMENT_TOKEN_SECRET
+    try {
+      iiskillsPayload = verifyIiskillsToken(iiskills_token);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
+    }
+    user_id = iiskillsPayload.user_id || null;
+    app_name = 'iiskills';
+    webhookUrl = null; // handled via iiskills confirm, not old webhook
+  } else if (session_token) {
+    // Token-based flow (jai-bharat, jai-kisan): verify token and use its data
     let payload;
     try {
       payload = verifyHandoffToken(session_token);
@@ -51,18 +148,14 @@ export default async function handler(req, res) {
     webhookUrl =
       app_name === 'jai-kisan'
         ? process.env.JAI_KISAN_WEBHOOK_URL
-        : app_name === 'iiskills'
-        ? process.env.IISKILLS_WEBHOOK_URL
         : process.env.JAI_BHARAT_WEBHOOK_URL;
   } else {
-    // Legacy flow (iiskills and direct API callers)
+    // Legacy flow (direct API callers)
     user_id = bodyUserId;
     app_name = bodyAppName;
     webhookUrl =
       app_name === 'jai-kisan'
         ? process.env.JAI_KISAN_WEBHOOK_URL
-        : app_name === 'iiskills'
-        ? process.env.IISKILLS_WEBHOOK_URL
         : process.env.JAI_BHARAT_WEBHOOK_URL;
   }
 
@@ -76,6 +169,8 @@ export default async function handler(req, res) {
     if (generatedSignature !== razorpay_signature) {
       return res.status(400).json({ error: 'Invalid payment signature' });
     }
+
+    const paidAt = new Date().toISOString();
 
     // Fetch payment method from Razorpay
     let paymentMethod = null;
@@ -92,6 +187,88 @@ export default async function handler(req, res) {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // New iiskills confirm flow (replaces old webhook for iiskills)
+    // -----------------------------------------------------------------------
+    if (iiskillsPayload) {
+      const amountPaise =
+        iiskillsPayload.amount_paise || iiskillsPayload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;
+
+      const confirmPayload = {
+        purchaseId: iiskillsPayload.purchaseId,
+        appId: iiskillsPayload.courseSlug,
+        amountPaise,
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        paidAt,
+        user_token: iiskills_token,
+      };
+
+      console.log(
+        `[verify-payment] iiskills confirm: purchaseId=${iiskillsPayload.purchaseId} razorpayPaymentId=${razorpay_payment_id}`,
+      );
+
+      // Update Supabase (non-fatal)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      let transactionId = null;
+
+      if (supabaseUrl && serviceRoleKey) {
+        try {
+          const supabase = createClient(supabaseUrl, serviceRoleKey);
+          const { data: transaction, error: dbErr } = await supabase
+            .from('payment_transactions')
+            .update({
+              razorpay_payment_id,
+              razorpay_signature,
+              status: 'success',
+              payment_method: paymentMethod,
+              paid_at: paidAt,
+              updated_at: paidAt,
+            })
+            .eq('razorpay_order_id', razorpay_order_id)
+            .select()
+            .single();
+
+          if (dbErr) {
+            console.error('[verify-payment] Supabase update failed (non-fatal):', dbErr.message);
+          } else {
+            transactionId = transaction?.id;
+          }
+        } catch (dbErr) {
+          console.error('[verify-payment] Supabase error (non-fatal):', dbErr.message);
+        }
+      }
+
+      const confirmResult = await callIiskillsConfirm(confirmPayload);
+
+      if (!confirmResult.ok) {
+        console.error(
+          `[verify-payment] iiskills confirm failed: purchaseId=${iiskillsPayload.purchaseId} paymentId=${razorpay_payment_id} error=${confirmResult.error}`,
+        );
+        // Payment was captured by Razorpay; tell the browser so it can retry
+        return res.status(200).json({
+          success: true,
+          confirmFailed: true,
+          confirmError: confirmResult.error,
+          purchaseId: iiskillsPayload.purchaseId,
+          razorpayPaymentId: razorpay_payment_id,
+          transactionId,
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment confirmed',
+        redirect_url: confirmResult.redirectUrl,
+        transactionId,
+      });
+    }
+
+    // -----------------------------------------------------------------------
+    // Existing non-iiskills flow: Supabase update + webhook
+    // -----------------------------------------------------------------------
+
     // Update transaction in Supabase if configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -101,8 +278,6 @@ export default async function handler(req, res) {
 
     if (supabaseUrl && serviceRoleKey) {
       const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-      const paidAt = new Date().toISOString();
 
       const { data: transaction, error } = await supabase
         .from('payment_transactions')
@@ -119,29 +294,21 @@ export default async function handler(req, res) {
         .single();
 
       if (error) {
-        // Non-fatal: payment_transactions table may not exist yet, or the row
-        // was never created (e.g. Supabase was not configured during order
-        // creation).  The signature is already verified above so we continue
-        // and return a successful response to the client.
         console.error('[verify-payment] Supabase update on payment_transactions failed (non-fatal):', error.message);
       } else {
         transactionId = transaction?.id;
         transactionRecord = transaction;
 
-
         // Determine webhook URL for this app segment
         const appName = transaction?.app_name;
-        const webhookUrl =
+        const resolvedWebhookUrl =
           appName === 'jai-kisan'
             ? process.env.JAI_KISAN_WEBHOOK_URL
-            : appName === 'iiskills'
-            ? process.env.IISKILLS_WEBHOOK_URL
-            : process.env.JAI_BHARAT_WEBHOOK_URL;
+            : appName === 'jai-bharat'
+            ? process.env.JAI_BHARAT_WEBHOOK_URL
+            : webhookUrl;
 
-
-        // Send webhook to respective app backend (URL resolved above from token or env)
-
-        if (webhookUrl) {
+        if (resolvedWebhookUrl) {
           try {
             const webhookPayload = {
               session_id: transaction?.session_id || session_id || null,
@@ -167,7 +334,7 @@ export default async function handler(req, res) {
               headers['X-AI-ENTER-SIGNATURE'] = signWebhookPayload(rawBody);
             }
 
-            const webhookRes = await fetch(webhookUrl, {
+            const webhookRes = await fetch(resolvedWebhookUrl, {
               method: 'POST',
               headers,
               body: rawBody,
@@ -176,7 +343,7 @@ export default async function handler(req, res) {
 
             if (!webhookRes.ok) {
               console.error(
-                `[verify-payment] Webhook to ${webhookUrl} failed (HTTP ${webhookRes.status}):`,
+                `[verify-payment] Webhook to ${resolvedWebhookUrl} failed (HTTP ${webhookRes.status}):`,
                 webhookData,
               );
             }

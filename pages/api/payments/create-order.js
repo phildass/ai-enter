@@ -2,7 +2,8 @@ import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
-import { IISKILLS_ALLOWED_COURSES } from '../../../lib/courses';
+import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
+import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 
 
 export default async function handler(req, res) {
@@ -12,8 +13,26 @@ export default async function handler(req, res) {
 
   let user_id, app_name, user_email, user_phone, customer_name, session_id, amount_paise, currency, validity_days, return_url, course;
 
-  if (req.body.session_token) {
-    // Token-based flow (jai-bharat, jai-kisan, iiskills)
+  if (req.body.iiskills_token) {
+    // New iiskills JWT flow: token issued by iiskills-cloud, verified with IISKILLS_PAYMENT_TOKEN_SECRET
+    let payload;
+    try {
+      payload = verifyIiskillsToken(req.body.iiskills_token);
+    } catch (err) {
+      return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
+    }
+    user_id = payload.user_id || null;
+    user_phone = payload.phone || payload.user_phone || null;
+    customer_name = payload.name || payload.customer_name || null;
+    app_name = 'iiskills';
+    course = payload.courseSlug;
+    amount_paise = payload.amount_paise || payload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;
+    currency = payload.currency || 'INR';
+    validity_days = payload.validity_days || 365;
+    return_url = payload.return_to || payload.return_url || null;
+    session_id = payload.purchaseId;
+  } else if (req.body.session_token) {
+    // Token-based flow (jai-bharat, jai-kisan)
     let payload;
     try {
       payload = verifyHandoffToken(req.body.session_token);
@@ -29,7 +48,7 @@ export default async function handler(req, res) {
     currency = payload.currency;
     validity_days = payload.validity_days;
     return_url = payload.return_url;
-    // iiskills passes course alongside the token (course selected on the payment page)
+    // course passed alongside token (course selected on the payment page)
     if (req.body.course !== undefined) {
       course = req.body.course;
       if (course && typeof course !== 'string') {
@@ -40,7 +59,7 @@ export default async function handler(req, res) {
       }
     }
   } else {
-    // Legacy flow (iiskills and direct API callers)
+    // Legacy flow (direct API callers)
     ({ user_id, app_name, user_email, user_phone, customer_name, course } = req.body);
     if (course && typeof course !== 'string') {
       return res.status(400).json({ error: 'Invalid course value' });

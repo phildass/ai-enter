@@ -1,21 +1,34 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
-import { verifyHandoffToken } from '../../lib/verifyHandoffToken';
+import { verifyIiskillsToken } from '../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
 
 const IISKILLS_COURSES = IISKILLS_ALLOWED_COURSES;
 
 export async function getServerSideProps({ query }) {
-  const { token } = query;
-  if (token) {
-    try {
-      const payload = verifyHandoffToken(token);
-      return { props: { tokenPayload: payload, rawToken: token } };
-    } catch (err) {
-      console.error('[iiskills] Token verification failed:', err.message);
-      return { props: { tokenError: 'Invalid payment link. Please open from iiskills.cloud.' } };
-    }
+  const { purchaseId, token } = query;
+
+  if (!purchaseId || !token) {
+    return { props: { tokenError: 'Invalid payment link. Missing required parameters.' } };
   }
-  return { props: {} };
+
+  try {
+    const payload = verifyIiskillsToken(token);
+
+    // Validate that the URL purchaseId matches the token's purchaseId
+    if (payload.purchaseId !== purchaseId) {
+      return { props: { tokenError: 'Invalid payment link. Purchase ID mismatch.' } };
+    }
+
+    // Validate course slug against the allowlist
+    if (!IISKILLS_COURSES.includes(payload.courseSlug)) {
+      return { props: { tokenError: 'Course not available for purchase.' } };
+    }
+
+    return { props: { tokenPayload: payload, rawToken: token, purchaseId } };
+  } catch (err) {
+    console.error('[iiskills] Token verification failed:', err.message);
+    return { props: { tokenError: 'Invalid payment link. Please open from iiskills.cloud.' } };
+  }
 }
 
 export default function IisSkillsPay({ tokenPayload, rawToken, tokenError }) {
