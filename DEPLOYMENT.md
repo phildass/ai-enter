@@ -24,6 +24,11 @@ This guide covers deploying the AI Cloud Enterprises Next.js application to a pr
 Create a `.env` file in the project root with the following variables:
 
 ```bash
+# API Base URL (leave empty when Next.js API routes live on the same host)
+# Set to an absolute URL only when the API is served from a different host,
+# e.g. NEXT_PUBLIC_API_BASE_URL=https://api.aienter.in
+NEXT_PUBLIC_API_BASE_URL=
+
 # Razorpay Configuration
 RAZORPAY_KEY_ID=your_razorpay_key_id_here
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret_here
