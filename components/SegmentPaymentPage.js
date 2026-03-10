@@ -154,6 +154,13 @@ export default function SegmentPaymentPage({
 
       if (!orderResponse.ok) {
         console.error('[payment] Order creation failed:', orderData.error);
+        // 409 means this purchase/session has already been paid — surface a clear message.
+        if (orderResponse.status === 409) {
+          setError(orderData.error || 'This payment link has already been used. Please start a new purchase.');
+          setLoading(false);
+          setLoadingStatus('');
+          return;
+        }
         throw new Error(orderData.error || 'Payment could not be initiated. Please try again.');
       }
       console.log('[payment] Order created:', orderData.orderId);
@@ -179,7 +186,7 @@ export default function SegmentPaymentPage({
       script.onload = () => {
         clearTimeout(scriptLoadTimeout);
         console.log('[payment] Razorpay script loaded, opening checkout');
-        setLoadingStatus('Processing your payment…');
+        setLoadingStatus('Payment window opened — complete payment to continue');
 
         const options = {
           key: orderData.keyId,
