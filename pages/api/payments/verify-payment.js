@@ -7,12 +7,18 @@ import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 
+const CONFIRM_TIMEOUT_MS = 15000;
+const MAX_CONFIRM_BODY_CHARS = 4000; // prevent log spam / huge HTML responses
+
+function safeTruncate(str, max = MAX_CONFIRM_BODY_CHARS) {
+  if (!str) return '';
+  if (str.length <= max) return str;
+  return str.slice(0, max) + `…(truncated, ${str.length - max} chars more)`;
+}
+
 /**
  * Compute the x-aienter-signature header value for the iiskills confirm request.
  * Signature = HMAC-SHA256(rawBody, AIENTER_CONFIRMATION_SIGNING_SECRET) as hex.
- *
- * @param {string} rawBody  The exact JSON string being sent as the request body.
- * @returns {string}        Hex-encoded HMAC-SHA256 signature.
  */
 function computeConfirmSignature(rawBody) {
   const secret = process.env.AIENTER_CONFIRMATION_SIGNING_SECRET;
@@ -30,11 +36,15 @@ function computeConfirmSignature(rawBody) {
  *   x-aienter-signature  – HMAC-SHA256 over the raw request body
  *   x-aienter-timestamp  – Unix timestamp in seconds for replay-protection on iiskills side
  *
- * @returns {{ ok: boolean, redirectUrl: string|null, error: string|null }}
+ * @returns {{
+ *   ok: boolean,
+ *   redirectUrl: string|null,
+ *   error: string|null,
+ *   debug?: any
+ * }}
  */
 async function callIiskillsConfirm(confirmPayload) {
-  const confirmUrl =
-    process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';
+  const confirmUrl = process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';
 
   const rawBody = JSON.stringify(confirmPayload);
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -43,13 +53,16 @@ async function callIiskillsConfirm(confirmPayload) {
   try {
     signature = computeConfirmSignature(rawBody);
   } catch (err) {
-    return { ok: false, redirectUrl: null, error: err.message };
+    return { ok: false, redirectUrl: null, error: err.message, debug: { stage: 'sign' } };
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), CONFIRM_TIMEOUT_MS);
 
   let confirmRes;
+  let responseText = '';
+  let responseJson = null;
+
   try {
     confirmRes = await fetch(confirmUrl, {
       method: 'POST',
@@ -61,35 +74,65 @@ async function callIiskillsConfirm(confirmPayload) {
       body: rawBody,
       signal: controller.signal,
     });
+
+    // Read body as text first so we can log it even if JSON parse fails.
+    responseText = await confirmRes.text();
+
+    try {
+      responseJson = responseText ? JSON.parse(responseText) : null;
+    } catch {
+      responseJson = null;
+    }
   } catch (fetchErr) {
     const msg =
       fetchErr.name === 'AbortError'
         ? 'iiskills confirm request timed out'
         : `iiskills confirm network error: ${fetchErr.message}`;
-    return { ok: false, redirectUrl: null, error: msg };
+
+    return {
+      ok: false,
+      redirectUrl: null,
+      error: msg,
+      debug: { stage: 'fetch', confirmUrl, timeoutMs: CONFIRM_TIMEOUT_MS },
+    };
   } finally {
     clearTimeout(timer);
   }
 
-  let confirmData = {};
-  try {
-    confirmData = await confirmRes.json();
-  } catch {
-    // ignore parse errors
-  }
+  const debug = {
+    stage: 'response',
+    confirmUrl,
+    status: confirmRes.status,
+    ok: confirmRes.ok,
+    timestamp,
+    // include a small subset of headers that help debug reverse proxy / auth issues
+    headers: {
+      'content-type': confirmRes.headers.get('content-type'),
+      'x-request-id': confirmRes.headers.get('x-request-id'),
+      'cf-ray': confirmRes.headers.get('cf-ray'),
+    },
+    body_text: safeTruncate(responseText || ''),
+    body_json: responseJson,
+  };
 
   if (!confirmRes.ok) {
     return {
       ok: false,
       redirectUrl: null,
       error: `iiskills confirm returned HTTP ${confirmRes.status}`,
+      debug,
     };
   }
 
+  // On success, prefer JSON redirect_url; otherwise attempt to read from parsed JSON.
+  const redirectUrl =
+    (responseJson && (responseJson.redirect_url || responseJson.redirectUrl)) || null;
+
   return {
     ok: true,
-    redirectUrl: confirmData.redirect_url || null,
+    redirectUrl,
     error: null,
+    debug,
   };
 }
 
@@ -104,6 +147,9 @@ export default async function handler(req, res) {
     razorpay_signature,
 
     session_id,
+
+    // For iiskills JWT flow (token may omit it); forwarded from the payment page query string.
+    purchaseId,
 
     iiskills_token,
     session_token,
@@ -121,20 +167,18 @@ export default async function handler(req, res) {
 
   // Resolve user_id, app_name, webhook URL, and iiskills-specific data
   let user_id, app_name, webhookUrl;
-  let iiskillsPayload = null; // set for new iiskills JWT flow
+  let iiskillsPayload = null;
 
   if (iiskills_token) {
-    // New iiskills JWT flow: verify with IISKILLS_PAYMENT_TOKEN_SECRET
     try {
-      iiskillsPayload = verifyIiskillsToken(iiskills_token);
+      iiskillsPayload = verifyIiskillsToken(iiskills_token, { expectedPurchaseId: purchaseId });
     } catch (err) {
       return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
     }
     user_id = iiskillsPayload.user_id || null;
     app_name = 'iiskills';
-    webhookUrl = null; // handled via iiskills confirm, not old webhook
+    webhookUrl = null;
   } else if (session_token) {
-    // Token-based flow (jai-bharat, jai-kisan): verify token and use its data
     let payload;
     try {
       payload = verifyHandoffToken(session_token);
@@ -143,20 +187,14 @@ export default async function handler(req, res) {
     }
     user_id = payload.user_id;
     app_name = payload.app_name;
-    // Always use environment-configured webhook URL (not token's return_url)
-    // to prevent origin sites from redirecting webhooks to arbitrary endpoints
+
     webhookUrl =
-      app_name === 'jai-kisan'
-        ? process.env.JAI_KISAN_WEBHOOK_URL
-        : process.env.JAI_BHARAT_WEBHOOK_URL;
+      app_name === 'jai-kisan' ? process.env.JAI_KISAN_WEBHOOK_URL : process.env.JAI_BHARAT_WEBHOOK_URL;
   } else {
-    // Legacy flow (direct API callers)
     user_id = bodyUserId;
     app_name = bodyAppName;
     webhookUrl =
-      app_name === 'jai-kisan'
-        ? process.env.JAI_KISAN_WEBHOOK_URL
-        : process.env.JAI_BHARAT_WEBHOOK_URL;
+      app_name === 'jai-kisan' ? process.env.JAI_KISAN_WEBHOOK_URL : process.env.JAI_BHARAT_WEBHOOK_URL;
   }
 
   try {
@@ -172,7 +210,7 @@ export default async function handler(req, res) {
 
     const paidAt = new Date().toISOString();
 
-    // Fetch payment method from Razorpay
+    // Fetch payment method from Razorpay (non-fatal)
     let paymentMethod = null;
     if (process.env.RAZORPAY_KEY_ID) {
       try {
@@ -188,7 +226,7 @@ export default async function handler(req, res) {
     }
 
     // -----------------------------------------------------------------------
-    // New iiskills confirm flow (replaces old webhook for iiskills)
+    // iiskills confirm flow
     // -----------------------------------------------------------------------
     if (iiskillsPayload) {
       const amountPaise =
@@ -246,11 +284,15 @@ export default async function handler(req, res) {
         console.error(
           `[verify-payment] iiskills confirm failed: purchaseId=${iiskillsPayload.purchaseId} paymentId=${razorpay_payment_id} error=${confirmResult.error}`,
         );
-        // Payment was captured by Razorpay; tell the browser so it can retry
+        if (confirmResult.debug) {
+          console.error('[verify-payment] iiskills confirm debug:', confirmResult.debug);
+        }
+
         return res.status(200).json({
           success: true,
           confirmFailed: true,
           confirmError: confirmResult.error,
+          confirmDebug: confirmResult.debug || null,
           purchaseId: iiskillsPayload.purchaseId,
           razorpayPaymentId: razorpay_payment_id,
           transactionId,
@@ -268,8 +310,6 @@ export default async function handler(req, res) {
     // -----------------------------------------------------------------------
     // Existing non-iiskills flow: Supabase update + webhook
     // -----------------------------------------------------------------------
-
-    // Update transaction in Supabase if configured
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -299,14 +339,13 @@ export default async function handler(req, res) {
         transactionId = transaction?.id;
         transactionRecord = transaction;
 
-        // Determine webhook URL for this app segment
         const appName = transaction?.app_name;
         const resolvedWebhookUrl =
           appName === 'jai-kisan'
             ? process.env.JAI_KISAN_WEBHOOK_URL
             : appName === 'jai-bharat'
-            ? process.env.JAI_BHARAT_WEBHOOK_URL
-            : webhookUrl;
+              ? process.env.JAI_BHARAT_WEBHOOK_URL
+              : webhookUrl;
 
         if (resolvedWebhookUrl) {
           try {

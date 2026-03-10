@@ -8,16 +8,16 @@ export async function getServerSideProps({ query }) {
   const { purchaseId, token } = query;
 
   if (!purchaseId || !token) {
-    return { props: { tokenError: 'Invalid payment link. Missing required parameters.' } };
+    return {
+      props: { tokenError: 'Invalid payment link. Missing required parameters.' },
+    };
   }
 
   try {
-    const payload = verifyIiskillsToken(token);
-
-    // Validate that the URL purchaseId matches the token's purchaseId
-    if (payload.purchaseId !== purchaseId) {
-      return { props: { tokenError: 'Invalid payment link. Purchase ID mismatch.' } };
-    }
+    // Pass the URL purchaseId into verification so tokens that omit purchaseId
+    // can still be validated. If the token *does* include purchaseId, the verifier
+    // will enforce that it matches this expectedPurchaseId.
+    const payload = verifyIiskillsToken(token, { expectedPurchaseId: purchaseId });
 
     // Validate course slug against the allowlist
     if (!IISKILLS_COURSES.includes(payload.courseSlug)) {
@@ -27,7 +27,9 @@ export async function getServerSideProps({ query }) {
     return { props: { tokenPayload: payload, rawToken: token, purchaseId } };
   } catch (err) {
     console.error('[iiskills] Token verification failed:', err.message);
-    return { props: { tokenError: 'Invalid payment link. Please open from iiskills.cloud.' } };
+    return {
+      props: { tokenError: 'Invalid payment link. Please open from iiskills.cloud.' },
+    };
   }
 }
 

@@ -21,8 +21,8 @@ export default async function handler(req, res) {
 
     // Check if Razorpay credentials are set
     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return res.status(500).json({ 
-        error: 'Payment system not configured. Please contact administrator.' 
+      return res.status(500).json({
+        error: 'Payment system not configured. Please contact administrator.',
       });
     }
 
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     // Initialize Razorpay
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
     // Create order
@@ -47,8 +47,8 @@ export default async function handler(req, res) {
         customerPhone: customerPhone,
         basePrice: feeInfo.displayBase,
         gst: feeInfo.displayGst,
-        total: feeInfo.displayTotal
-      }
+        total: feeInfo.displayTotal,
+      },
     };
 
     const order = await razorpay.orders.create(options);
@@ -58,12 +58,12 @@ export default async function handler(req, res) {
       amount: order.amount,
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
-      feeInfo: feeInfo
+      feeInfo: feeInfo,
     });
   } catch (error) {
     console.error('Error creating order:', error);
-    res.status(500).json({ 
-      error: 'Unable to process payment. Please try again.'
+    res.status(500).json({
+      error: 'Unable to process payment. Please try again.',
     });
   }
 }

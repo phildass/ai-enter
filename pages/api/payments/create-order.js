@@ -5,31 +5,47 @@ import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  let user_id, app_name, user_email, user_phone, customer_name, session_id, amount_paise, currency, validity_days, return_url, course;
+  let user_id,
+    app_name,
+    user_email,
+    user_phone,
+    customer_name,
+    session_id,
+    amount_paise,
+    currency,
+    validity_days,
+    return_url,
+    course;
 
   if (req.body.iiskills_token) {
     // New iiskills JWT flow: token issued by iiskills-cloud, verified with IISKILLS_PAYMENT_TOKEN_SECRET
     let payload;
     try {
-      payload = verifyIiskillsToken(req.body.iiskills_token);
+      // IMPORTANT: token may omit purchaseId; accept it from request body (from query string)
+      payload = verifyIiskillsToken(req.body.iiskills_token, {
+        expectedPurchaseId: req.body.purchaseId,
+      });
     } catch (err) {
       return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
     }
+
     user_id = payload.user_id || null;
     user_phone = payload.phone || payload.user_phone || null;
     customer_name = payload.name || payload.customer_name || null;
     app_name = 'iiskills';
     course = payload.courseSlug;
+
     amount_paise = payload.amount_paise || payload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;
     currency = payload.currency || 'INR';
     validity_days = payload.validity_days || 365;
     return_url = payload.return_to || payload.return_url || null;
+
+    // For iiskills, session_id == purchaseId
     session_id = payload.purchaseId;
   } else if (req.body.session_token) {
     // Token-based flow (jai-bharat, jai-kisan)
@@ -48,6 +64,7 @@ export default async function handler(req, res) {
     currency = payload.currency;
     validity_days = payload.validity_days;
     return_url = payload.return_url;
+
     // course passed alongside token (course selected on the payment page)
     if (req.body.course !== undefined) {
       course = req.body.course;
@@ -55,7 +72,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid course value' });
       }
       if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
-        return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
+        return res
+          .status(400)
+          .json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
       }
     }
   } else {
@@ -65,7 +84,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid course value' });
     }
     if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
-      return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
+      return res.status(400).json({
+        error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', '),
+      });
     }
   }
 
@@ -73,15 +94,64 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Payment system not configured' });
   }
 
+  // Supabase (optional but enables idempotency + "already paid" protection)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase =
+    supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
   try {
+    // --- Idempotency / reuse protection (requires Supabase configured) ---
+    if (supabase && app_name && session_id) {
+      // Find latest transaction for this app_name + session_id
+      const { data: existing, error: existingErr } = await supabase
+        .from('payment_transactions')
+        .select('id, razorpay_order_id, status, amount, currency, return_url')
+        .eq('app_name', app_name)
+        .eq('session_id', session_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (existingErr) {
+        // Non-fatal: continue with fresh order, but log it.
+        console.error('[create-order] Supabase lookup failed (non-fatal):', existingErr.message);
+      } else if (existing && existing.length > 0) {
+        const row = existing[0];
+
+        // If already paid, do not allow reusing the same purchase/session link
+        if (row.status === 'paid') {
+          return res.status(409).json({
+            error: 'This payment link has already been used. Please start a new purchase.',
+          });
+        }
+
+        // If there is already a pending order, reuse it (do NOT create new order)
+        if (row.status === 'pending' && row.razorpay_order_id) {
+          return res.status(200).json({
+            orderId: row.razorpay_order_id,
+            amount: Math.round((row.amount || (amount_paise || 11682) / 100) * 100), // paise
+            currency: row.currency || currency || 'INR',
+            keyId: process.env.RAZORPAY_KEY_ID,
+            session_id,
+            return_url: row.return_url || return_url || null,
+            reused: true,
+          });
+        }
+      }
+    }
+
+    // --- Create a new Razorpay order ---
     const razorpay = new Razorpay({
       key_id: process.env.RAZORPAY_KEY_ID,
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
+    const finalAmountPaise = amount_paise || 11682;
+    const finalCurrency = currency || 'INR';
+
     const order = await razorpay.orders.create({
-      amount: amount_paise || 11682,
-      currency: currency || 'INR',
+      amount: finalAmountPaise,
+      currency: finalCurrency,
       receipt: `${app_name}_${session_id || Date.now()}`.slice(0, 40),
       notes: {
         user_id,
@@ -95,34 +165,29 @@ export default async function handler(req, res) {
     });
 
     // Save transaction to Supabase if configured
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (supabaseUrl && serviceRoleKey) {
-      const supabase = createClient(supabaseUrl, serviceRoleKey);
-      const { error } = await supabase
-        .from('payment_transactions')
-        .insert({
-          user_id: user_id || null,
-          user_email: user_email || null,
-          user_phone: user_phone || null,
-          customer_name: customer_name || null,
-          app_name,
-          session_id,
-          razorpay_order_id: order.id,
-          amount: (amount_paise || 11682) / 100,
-          currency: currency || 'INR',
-          validity_days: validity_days || 30,
-          return_url: return_url || null,
-          course: course || null,
-          status: 'pending',
-        });
+    if (supabase) {
+      const { error } = await supabase.from('payment_transactions').insert({
+        user_id: user_id || null,
+        user_email: user_email || null,
+        user_phone: user_phone || null,
+        customer_name: customer_name || null,
+        app_name,
+        session_id,
+        razorpay_order_id: order.id,
+        amount: finalAmountPaise / 100,
+        currency: finalCurrency,
+        validity_days: validity_days || 30,
+        return_url: return_url || null,
+        course: course || null,
+        status: 'pending',
+      });
 
       if (error) {
-        // Non-fatal: payment_transactions table may not exist yet, or a column may
-        // differ from the schema.  The Razorpay order is already created so we
-        // continue and return a successful response to the client.
-        console.error('[create-order] Supabase insert into payment_transactions failed (non-fatal):', error.message);
+        // Non-fatal
+        console.error(
+          '[create-order] Supabase insert into payment_transactions failed (non-fatal):',
+          error.message,
+        );
       }
     }
 
@@ -133,6 +198,7 @@ export default async function handler(req, res) {
       keyId: process.env.RAZORPAY_KEY_ID,
       session_id,
       return_url: return_url || null,
+      reused: false,
     });
   } catch (error) {
     console.error('Order creation error:', error);
