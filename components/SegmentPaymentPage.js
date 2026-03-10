@@ -167,7 +167,7 @@ export default function SegmentPaymentPage({
       script.onload = () => {
         clearTimeout(loadTimeout);
         console.log('[payment] Razorpay script loaded, opening checkout');
-        setStatusText('Processing your payment…');
+        setStatusText('Payment window opened — complete payment to continue…');
 
         const options = {
           key: createJson.keyId,
