@@ -1,0 +1,1517 @@
+[1mdiff --git a/.yarn/install-state.gz b/.yarn/install-state.gz[m
+[1mindex 3852be9..c98dd44 100644[m
+Binary files a/.yarn/install-state.gz and b/.yarn/install-state.gz differ
+[1mdiff --git a/components/SegmentPaymentPage.js b/components/SegmentPaymentPage.js[m
+[1mindex 241d520..ef9eafa 100644[m
+[1m--- a/components/SegmentPaymentPage.js[m
+[1m+++ b/components/SegmentPaymentPage.js[m
+[36m@@ -1,51 +1,24 @@[m
+[31m-import { useState } from 'react';[m
+[31m-import { useRouter } from 'next/router';[m
+[32m+[m[32mimport React, { useEffect, useMemo, useState } from 'react';[m
+ import Head from 'next/head';[m
+[32m+[m[32mimport { useRouter } from 'next/router';[m
+[32m+[m
+[32m+[m[32m// NOTE: This file was updated to improve Razorpay cancel/failure handling.[m
+[32m+[m[32m// Key changes:[m
+[32m+[m[32m// - Add rzp.on('payment.failed', ...) to show a clear error and stop redirect/verification attempts.[m
+[32m+[m[32m// - Improve modal.ondismiss message to explicitly say "Payment cancelled".[m
+[32m+[m[32m// - Guard the success handler to ensure required Razorpay fields exist before calling verify.[m
+[32m+[m[32m// - Keep behavior: only verify on success handler; cancel/fail do not verify.[m
+ [m
+[31m-/**[m
+[31m- * Reusable payment page component for iiskills, jaibharat, and jaikisan segments.[m
+[31m- *[m
+[31m- * Props:[m
+[31m- *   - segmentKey: API app_name value ('iiskills' | 'jai-bharat' | 'jai-kisan')[m
+[31m- *   - brandName: Display name e.g. 'IIS Skills'[m
+[31m- *   - emoji: Emoji icon for the brand[m
+[31m- *   - bgGradient: CSS gradient string for page background[m
+[31m- *   - iconBg: Background color for the emoji circle[m
+[31m- *   - titleColor: CSS color for the brand title[m
+[31m- *   - accentGradient: CSS gradient for the pricing box[m
+[31m- *   - accentColor: Solid accent color (button, etc.)[m
+[31m- *   - accentDisabled: Disabled button color[m
+[31m- *   - validityText: e.g. '1 Year' or '1 Month'[m
+[31m- *   - validityLabel: e.g. '1-Year Access' (used as plan label)[m
+[31m- *   - features: string[] of feature bullet points[m
+[31m- *   - originDomain: e.g. 'iiskills.cloud' for the invalid-link message[m
+[31m- *   - description: Razorpay checkout description string[m
+[31m- *   - allowedCourses: string[] - if set, enables course-based entry (no user_id required);[m
+[31m- *       a dropdown is shown so the user can select a course if not provided in the URL.[m
+[31m- */[m
+[31m-[m
+[31m-/**[m
+[31m- * Returns the API base URL from the NEXT_PUBLIC_API_BASE_URL env var.[m
+[31m- * Defaults to '' (empty string) so that all fetch calls use same-origin[m
+[31m- * relative paths when no explicit base is configured.[m
+[31m- * Set NEXT_PUBLIC_API_BASE_URL to an absolute URL (e.g. https://api.aienter.in)[m
+[31m- * when the Next.js API routes are deployed on a separate host.[m
+[31m- */[m
+[31m-function getApiBase() {[m
+[32m+[m[32mfunction getApiBaseUrl() {[m
+   return (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');[m
+ }[m
+ [m
+[31m-const FETCH_TIMEOUT_MS = 30000; // 30 seconds – fail fast instead of hanging[m
+[31m-[m
+[31m-/**[m
+[31m- * Wrapper around fetch that rejects after FETCH_TIMEOUT_MS milliseconds,[m
+[31m- * surfacing a user-visible error rather than spinning forever.[m
+[31m- */[m
+ function fetchWithTimeout(url, options) {[m
+   const controller = new AbortController();[m
+[31m-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);[m
+[32m+[m[32m  const timeout = setTimeout(() => controller.abort(), 30000);[m
+[32m+[m
+   return fetch(url, { ...options, signal: controller.signal }).finally(() =>[m
+[31m-    clearTimeout(timer)[m
+[32m+[m[32m    clearTimeout(timeout),[m
+   );[m
+ }[m
+ [m
+[36m@@ -56,7 +29,7 @@[m [mconst COURSE_LABELS = {[m
+   'learn-management': 'Learn Management',[m
+ };[m
+ [m
+[31m-const PHONE_REGEX = /^\d{10}$/;[m
+[32m+[m[32mconst PHONE_RE = /^\d{10}$/;[m
+ [m
+ export default function SegmentPaymentPage({[m
+   segmentKey,[m
+[36m@@ -80,270 +53,341 @@[m [mexport default function SegmentPaymentPage({[m
+ }) {[m
+   const router = useRouter();[m
+ [m
+[31m-  // For token-based flow (jai-bharat, jai-kisan): use verified server-side payload.[m
+[31m-  // For legacy flow (iiskills): fall back to query params.[m
+[31m-  const user_id = tokenPayload ? tokenPayload.user_id : router.query.user_id;[m
+[31m-  const email = tokenPayload ? tokenPayload.user_email : router.query.email;[m
+[32m+[m[32m  const userIdFromToken = tokenPayload ? tokenPayload.user_id : undefined;[m
+[32m+[m[32m  const userEmailFromToken = tokenPayload ? tokenPayload.user_email : undefined;[m
+[32m+[m
+[32m+[m[32m  const userId = tokenPayload ? userIdFromToken : router.query.user_id;[m
+[32m+[m[32m  const userEmail = tokenPayload ? userEmailFromToken : router.query.email;[m
+[32m+[m
+[32m+[m[32m  const purchaseId = router.isReady ? router.query.purchaseId : undefined;[m
+[32m+[m[32m  const courseFromQuery = router.isReady ? router.query.course : undefined;[m
+ [m
+[31m-  // Course selection for course-based segments (e.g. iiskills).[m
+[31m-  // Prefers query param; falls back to dropdown selection via state.[m
+   const [selectedCourse, setSelectedCourse] = useState('');[m
+[31m-  const queryCourse = router.isReady ? router.query.course : undefined;[m
+[31m-  const course = allowedCourses ? (queryCourse || selectedCourse || '') : null;[m
+[31m-  const isCourseValid = !allowedCourses || allowedCourses.includes(course);[m
+[32m+[m[32m  const course = allowedCourses ? courseFromQuery || selectedCourse || '' : null;[m
+[32m+[m
+[32m+[m[32m  const courseAllowed = !allowedCourses || allowedCourses.includes(course);[m
+ [m
+[31m-  const [loading, setLoading] = useState(false);[m
+[31m-  const [loadingStatus, setLoadingStatus] = useState('');[m
+[32m+[m[32m  const [processing, setProcessing] = useState(false);[m
+[32m+[m[32m  const [statusText, setStatusText] = useState('');[m
+   const [error, setError] = useState('');[m
+[32m+[m[32m  const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);[m
+[32m+[m
+[32m+[m[32m  // Customer details (used on iiskills page)[m
+   const [firstName, setFirstName] = useState('');[m
+   const [lastName, setLastName] = useState('');[m
+   const [phone, setPhone] = useState('');[m
+ [m
+[31m-  // Stores the Razorpay response when iiskills confirm failed so we can retry[m
+[31m-  const [confirmFailedData, setConfirmFailedData] = useState(null);[m
+[31m-[m
+[31m-  // For iiskills (course-based), require name and phone[m
+[31m-  const isNamePhoneValid = !allowedCourses || (firstName.trim() && lastName.trim() && PHONE_REGEX.test(phone.trim()));[m
+[32m+[m[32m  const canSubmitCustomerDetails = useMemo(() => {[m
+[32m+[m[32m    if (!allowedCourses) return true;[m
+[32m+[m[32m    return ([m
+[32m+[m[32m      firstName.trim().length > 0 &&[m
+[32m+[m[32m      lastName.trim().length > 0 &&[m
+[32m+[m[32m      PHONE_RE.test(phone.trim())[m
+[32m+[m[32m    );[m
+[32m+[m[32m  }, [allowedCourses, firstName, lastName, phone]);[m
+ [m
+[31m-  // Whether this is the new iiskills JWT-based flow[m
+[31m-  const isIiskillsJwt = segmentKey === 'iiskills' && !!rawToken;[m
+[32m+[m[32m  const isIiskillsSegment = segmentKey === 'iiskills' && !!rawToken;[m
+ [m
+[31m-  const handlePayment = async () => {[m
+[31m-    setLoading(true);[m
+[31m-    setLoadingStatus('Creating order…');[m
+[32m+[m[32m  // Main pay action[m
+[32m+[m[32m  const startPayment = async () => {[m
+[32m+[m[32m    setProcessing(true);[m
+[32m+[m[32m    setStatusText('Creating order…');[m
+     setError('');[m
+[31m-    setConfirmFailedData(null);[m
+[32m+[m[32m    setConfirmRetryPayload(null);[m
+ [m
+[31m-    const apiBase = getApiBase();[m
+[32m+[m[32m    const apiBase = getApiBaseUrl();[m
+ [m
+     try {[m
+[31m-      // Build create-order request body[m
+[31m-      let orderBody;[m
+[31m-      if (isIiskillsJwt) {[m
+[31m-        // New iiskills JWT flow: send the iiskills token directly[m
+[31m-        orderBody = { iiskills_token: rawToken };[m
+[31m-      } else if (rawToken) {[m
+[31m-        orderBody = { session_token: rawToken, ...(course ? { course } : {}) };[m
+[32m+[m[32m      let body;[m
+[32m+[m
+[32m+[m[32m      if (isIiskillsSegment) {[m
+[32m+[m[32m        if (!purchaseId) throw new Error('Invalid payment link. Missing purchaseId.');[m
+[32m+[m[32m        body = { iiskills_token: rawToken, purchaseId };[m
+       } else {[m
+[31m-        orderBody = {[m
+[31m-          user_id,[m
+[31m-          app_name: segmentKey,[m
+[31m-          user_email: email || '',[m
+[31m-          customer_name: allowedCourses ? `${firstName.trim()} ${lastName.trim()}` : undefined,[m
+[31m-          user_phone: allowedCourses ? phone.trim() : undefined,[m
+[31m-          course: course || undefined,[m
+[31m-        };[m
+[32m+[m[32m        body = rawToken[m
+[32m+[m[32m          ? {[m
+[32m+[m[32m              session_token: rawToken,[m
+[32m+[m[32m              ...(course ? { course } : {}),[m
+[32m+[m[32m            }[m
+[32m+[m[32m          : {[m
+[32m+[m[32m              user_id: userId,[m
+[32m+[m[32m              app_name: segmentKey,[m
+[32m+[m[32m              user_email: userEmail || '',[m
+[32m+[m[32m              customer_name: allowedCourses[m
+[32m+[m[32m                ? `${firstName.trim()} ${lastName.trim()}`[m
+[32m+[m[32m                : undefined,[m
+[32m+[m[32m              user_phone: allowedCourses ? phone.trim() : undefined,[m
+[32m+[m[32m              course: course || undefined,[m
+[32m+[m[32m            };[m
+       }[m
+ [m
+       console.log('[payment] Creating order for app:', segmentKey);[m
+[31m-      let orderResponse;[m
+[32m+[m
+[32m+[m[32m      let createRes;[m
+       try {[m
+[31m-        orderResponse = await fetchWithTimeout(`${apiBase}/api/payments/create-order`, {[m
+[32m+[m[32m        createRes = await fetchWithTimeout(`${apiBase}/api/payments/create-order`, {[m
+           method: 'POST',[m
+           headers: { 'Content-Type': 'application/json' },[m
+[31m-          body: JSON.stringify(orderBody),[m
+[32m+[m[32m          body: JSON.stringify(body),[m
+         });[m
+[31m-      } catch (fetchErr) {[m
+[31m-        if (fetchErr.name === 'AbortError') {[m
+[31m-          throw new Error('Order creation timed out. Please check your connection and try again.');[m
+[32m+[m[32m      } catch (e) {[m
+[32m+[m[32m        if (e.name === 'AbortError') {[m
+[32m+[m[32m          throw new Error([m
+[32m+[m[32m            'Order creation timed out. Please check your connection and try again.',[m
+[32m+[m[32m          );[m
+         }[m
+[31m-        throw new Error('Could not reach the payment server. Please check your connection and try again.');[m
+[32m+[m[32m        throw new Error([m
+[32m+[m[32m          'Could not reach the payment server. Please check your connection and try again.',[m
+[32m+[m[32m        );[m
+       }[m
+ [m
+[31m-      const orderData = await orderResponse.json();[m
+[31m-[m
+[31m-      if (!orderResponse.ok) {[m
+[31m-        console.error('[payment] Order creation failed:', orderData.error);[m
+[31m-        throw new Error(orderData.error || 'Payment could not be initiated. Please try again.');[m
+[32m+[m[32m      const createJson = await createRes.json();[m
+[32m+[m[32m      if (!createRes.ok) {[m
+[32m+[m[32m        console.error('[payment] Order creation failed:', createJson?.error);[m
+[32m+[m[32m        throw new Error(createJson?.error || 'Payment could not be initiated. Please try again.');[m
+       }[m
+[31m-      console.log('[payment] Order created:', orderData.orderId);[m
+ [m
+[31m-      setLoadingStatus('Loading payment gateway…');[m
+[32m+[m[32m      console.log('[payment] Order created:', createJson.orderId);[m
+[32m+[m[32m      setStatusText('Loading payment gateway…');[m
+ [m
+[32m+[m[32m      // Load Razorpay checkout script[m
+       const script = document.createElement('script');[m
+       script.src = 'https://checkout.razorpay.com/v1/checkout.js';[m
+       script.async = true;[m
+       document.body.appendChild(script);[m
+ [m
+[31m-      // Fail fast if the Razorpay SDK does not load within 15 seconds.[m
+[31m-      const scriptLoadTimeout = setTimeout(() => {[m
+[32m+[m[32m      const loadTimeout = setTimeout(() => {[m
+         console.error('[payment] Razorpay script load timed out');[m
+[31m-        if (script.parentNode) {[m
+[31m-          document.body.removeChild(script);[m
+[31m-        }[m
+[32m+[m[32m        if (script.parentNode) document.body.removeChild(script);[m
+         setError('Payment gateway took too long to load. Please refresh and try again.');[m
+[31m-        setLoading(false);[m
+[31m-        setLoadingStatus('');[m
+[32m+[m[32m        setProcessing(false);[m
+[32m+[m[32m        setStatusText('');[m
+       }, 15000);[m
+ [m
+       script.onload = () => {[m
+[31m-        clearTimeout(scriptLoadTimeout);[m
+[32m+[m[32m        clearTimeout(loadTimeout);[m
+         console.log('[payment] Razorpay script loaded, opening checkout');[m
+[31m-        setLoadingStatus('Processing your payment…');[m
+[32m+[m[32m        setStatusText('Processing your payment…');[m
+ [m
+         const options = {[m
+[31m-          key: orderData.keyId,[m
+[31m-          amount: orderData.amount,[m
+[31m-          currency: orderData.currency,[m
+[32m+[m[32m          key: createJson.keyId,[m
+[32m+[m[32m          amount: createJson.amount,[m
+[32m+[m[32m          currency: createJson.currency,[m
+           name: brandName,[m
+           description,[m
+[31m-          order_id: orderData.orderId,[m
+[31m-          handler: async function (response) {[m
+[31m-            setLoadingStatus('Verifying payment…');[m
+[31m-            console.log('[payment] Razorpay payment received, verifying:', response.razorpay_payment_id);[m
+[31m-[m
+[31m-            await handleVerifyPayment({[m
+[31m-              razorpay_order_id: response.razorpay_order_id,[m
+[31m-              razorpay_payment_id: response.razorpay_payment_id,[m
+[31m-              razorpay_signature: response.razorpay_signature,[m
+[31m-              orderData,[m
+[31m-            });[m
+[32m+[m[32m          order_id: createJson.orderId,[m
+[32m+[m
+[32m+[m[32m          handler: async function (resp) {[m
+[32m+[m[32m            try {[m
+[32m+[m[32m              // Guard: only verify on a real success callback with required IDs.[m
+[32m+[m[32m              if ([m
+[32m+[m[32m                !resp?.razorpay_order_id ||[m
+[32m+[m[32m                !resp?.razorpay_payment_id ||[m
+[32m+[m[32m                !resp?.razorpay_signature[m
+[32m+[m[32m              ) {[m
+[32m+[m[32m                console.error('[payment] Missing Razorpay fields in handler:', resp);[m
+[32m+[m[32m                setError('Payment did not complete. Please try again.');[m
+[32m+[m[32m                setProcessing(false);[m
+[32m+[m[32m                setStatusText('');[m
+[32m+[m[32m                return;[m
+[32m+[m[32m              }[m
+[32m+[m
+[32m+[m[32m              setStatusText('Verifying payment…');[m
+[32m+[m[32m              console.log([m
+[32m+[m[32m                '[payment] Razorpay payment received, verifying:',[m
+[32m+[m[32m                resp.razorpay_payment_id,[m
+[32m+[m[32m              );[m
+[32m+[m
+[32m+[m[32m              await verifyPayment({[m
+[32m+[m[32m                razorpay_order_id: resp.razorpay_order_id,[m
+[32m+[m[32m                razorpay_payment_id: resp.razorpay_payment_id,[m
+[32m+[m[32m                razorpay_signature: resp.razorpay_signature,[m
+[32m+[m[32m                orderData: createJson,[m
+[32m+[m[32m              });[m
+[32m+[m[32m            } catch (e) {[m
+[32m+[m[32m              console.error('[payment] handler error:', e);[m
+[32m+[m[32m              setError(e?.message || 'Payment verification failed. Please try again.');[m
+[32m+[m[32m              setProcessing(false);[m
+[32m+[m[32m              setStatusText('');[m
+[32m+[m[32m            }[m
+           },[m
+[32m+[m
+           modal: {[m
+             ondismiss: function () {[m
+               console.log('[payment] Checkout modal dismissed');[m
+[31m-              setLoading(false);[m
+[31m-              setLoadingStatus('');[m
+[32m+[m[32m              // Make cancel explicit; do NOT verify, do NOT redirect.[m
+[32m+[m[32m              setError('Payment cancelled. No money was debited.');[m
+[32m+[m[32m              setProcessing(false);[m
+[32m+[m[32m              setStatusText('');[m
+             },[m
+           },[m
+[31m-          theme: {[m
+[31m-            color: accentColor,[m
+[31m-          },[m
+[32m+[m
+[32m+[m[32m          theme: { color: accentColor },[m
+         };[m
+ [m
+         const rzp = new window.Razorpay(options);[m
+[32m+[m
+[32m+[m[32m        // IMPORTANT: handle checkout failures (desktop deep-link failures, insufficient funds, etc.)[m
+[32m+[m[32m        rzp.on('payment.failed', function (resp) {[m
+[32m+[m[32m          console.error('[payment] payment.failed:', resp?.error);[m
+[32m+[m
+[32m+[m[32m          const msg =[m
+[32m+[m[32m            resp?.error?.description ||[m
+[32m+[m[32m            resp?.error?.reason ||[m
+[32m+[m[32m            'Payment failed. Please try again using UPI QR / Google Pay / card.';[m
+[32m+[m
+[32m+[m[32m          setError(msg);[m
+[32m+[m[32m          setProcessing(false);[m
+[32m+[m[32m          setStatusText('');[m
+[32m+[m[32m        });[m
+[32m+[m
+         rzp.open();[m
+       };[m
+ [m
+       script.onerror = () => {[m
+[31m-        clearTimeout(scriptLoadTimeout);[m
+[32m+[m[32m        clearTimeout(loadTimeout);[m
+         console.error('[payment] Failed to load Razorpay script');[m
+         setError('Failed to load payment gateway. Please try again.');[m
+[31m-        setLoading(false);[m
+[31m-        setLoadingStatus('');[m
+[32m+[m[32m        setProcessing(false);[m
+[32m+[m[32m        setStatusText('');[m
+       };[m
+[31m-    } catch (err) {[m
+[31m-      console.error('[payment] Unexpected error:', err);[m
+[31m-      setError(err.message || 'Payment failed. Please try again.');[m
+[31m-      setLoading(false);[m
+[31m-      setLoadingStatus('');[m
+[32m+[m[32m    } catch (e) {[m
+[32m+[m[32m      console.error('[payment] Unexpected error:', e);[m
+[32m+[m[32m      setError(e?.message || 'Payment failed. Please try again.');[m
+[32m+[m[32m      setProcessing(false);[m
+[32m+[m[32m      setStatusText('');[m
+     }[m
+   };[m
+ [m
+[31m-  /**[m
+[31m-   * Send the Razorpay payment details to our verify-payment API.[m
+[31m-   * For iiskills, the API will also call the iiskills-cloud confirm endpoint.[m
+[31m-   */[m
+[31m-  const handleVerifyPayment = async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData }) => {[m
+[31m-    const apiBase = getApiBase();[m
+[31m-[m
+[31m-    // Build verify body – iiskills uses the JWT token field, others use session_token[m
+[31m-    let verifyBody;[m
+[31m-    if (isIiskillsJwt) {[m
+[31m-      verifyBody = {[m
+[32m+[m[32m  const verifyPayment = async ({[m
+[32m+[m[32m    razorpay_order_id,[m
+[32m+[m[32m    razorpay_payment_id,[m
+[32m+[m[32m    razorpay_signature,[m
+[32m+[m[32m    orderData,[m
+[32m+[m[32m  }) => {[m
+[32m+[m[32m    const apiBase = getApiBaseUrl();[m
+[32m+[m
+[32m+[m[32m    let body;[m
+[32m+[m
+[32m+[m[32m    if (isIiskillsSegment) {[m
+[32m+[m[32m      if (!purchaseId) {[m
+[32m+[m[32m        setError('Invalid payment link. Missing purchaseId.');[m
+[32m+[m[32m        setProcessing(false);[m
+[32m+[m[32m        setStatusText('');[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m[32m      body = {[m
+         razorpay_order_id,[m
+         razorpay_payment_id,[m
+         razorpay_signature,[m
+         iiskills_token: rawToken,[m
+[31m-      };[m
+[31m-    } else if (rawToken) {[m
+[31m-      verifyBody = {[m
+[31m-        razorpay_order_id,[m
+[31m-        razorpay_payment_id,[m
+[31m-        razorpay_signature,[m
+[31m-        session_token: rawToken,[m
+[32m+[m[32m        purchaseId,[m
+       };[m
+     } else {[m
+[31m-      verifyBody = {[m
+[31m-        razorpay_order_id,[m
+[31m-        razorpay_payment_id,[m
+[31m-        razorpay_signature,[m
+[31m-        user_id,[m
+[31m-        app_name: segmentKey,[m
+[31m-        course: course || undefined,[m
+[31m-      };[m
+[32m+[m[32m      body = rawToken[m
+[32m+[m[32m        ? {[m
+[32m+[m[32m            razorpay_order_id,[m
+[32m+[m[32m            razorpay_payment_id,[m
+[32m+[m[32m            razorpay_signature,[m
+[32m+[m[32m            session_token: rawToken,[m
+[32m+[m[32m          }[m
+[32m+[m[32m        : {[m
+[32m+[m[32m            razorpay_order_id,[m
+[32m+[m[32m            razorpay_payment_id,[m
+[32m+[m[32m            razorpay_signature,[m
+[32m+[m[32m            user_id: userId,[m
+[32m+[m[32m            app_name: segmentKey,[m
+[32m+[m[32m            course: course || undefined,[m
+[32m+[m[32m          };[m
+     }[m
+ [m
+[31m-    let verifyResponse;[m
+[32m+[m[32m    let res;[m
+     try {[m
+[31m-      verifyResponse = await fetchWithTimeout(`${apiBase}/api/payments/verify-payment`, {[m
+[32m+[m[32m      res = await fetchWithTimeout(`${apiBase}/api/payments/verify-payment`, {[m
+         method: 'POST',[m
+         headers: { 'Content-Type': 'application/json' },[m
+[31m-        body: JSON.stringify(verifyBody),[m
+[32m+[m[32m        body: JSON.stringify(body),[m
+       });[m
+[31m-    } catch (fetchErr) {[m
+[32m+[m[32m    } catch (e) {[m
+       const msg =[m
+[31m-        fetchErr.name === 'AbortError'[m
+[31m-          ? 'Payment verification timed out. Your payment may have succeeded — please contact support with your payment ID: ' + razorpay_payment_id[m
+[31m-          : 'Could not reach the verification server. Your payment may have succeeded — please contact support with your payment ID: ' + razorpay_payment_id;[m
+[31m-      console.error('[payment] Verify fetch error:', fetchErr);[m
+[32m+[m[32m        e.name === 'AbortError'[m
+[32m+[m[32m          ? `Payment verification timed out. Your payment may have succeeded — please contact support with your payment ID: ${razorpay_payment_id}`[m
+[32m+[m[32m          : `Could not reach the verification server. Your payment may have succeeded — please contact support with your payment ID: ${razorpay_payment_id}`;[m
+[32m+[m[32m      console.error('[payment] Verify fetch error:', e);[m
+       setError(msg);[m
+[31m-      setLoading(false);[m
+[31m-      setLoadingStatus('');[m
+[32m+[m[32m      setProcessing(false);[m
+[32m+[m[32m      setStatusText('');[m
+       return;[m
+     }[m
+ [m
+[31m-    const verifyData = await verifyResponse.json();[m
+[32m+[m[32m    const json = await res.json();[m
+[32m+[m
+[32m+[m[32m    if (json?.success && json?.confirmFailed) {[m
+[32m+[m[32m      console.error([m
+[32m+[m[32m        '[payment] iiskills confirm failed:',[m
+[32m+[m[32m        json.confirmError,[m
+[32m+[m[32m        'purchaseId:',[m
+[32m+[m[32m        json.purchaseId,[m
+[32m+[m[32m        'paymentId:',[m
+[32m+[m[32m        razorpay_payment_id,[m
+[32m+[m[32m      );[m
+[32m+[m
+[32m+[m[32m      setConfirmRetryPayload({[m
+[32m+[m[32m        razorpay_order_id,[m
+[32m+[m[32m        razorpay_payment_id,[m
+[32m+[m[32m        razorpay_signature,[m
+[32m+[m[32m        orderData,[m
+[32m+[m[32m      });[m
+ [m
+[31m-    if (verifyData.success && verifyData.confirmFailed) {[m
+[31m-      // iiskills: Razorpay payment captured but iiskills-cloud confirm failed[m
+[31m-      console.error('[payment] iiskills confirm failed:', verifyData.confirmError, 'purchaseId:', verifyData.purchaseId, 'paymentId:', razorpay_payment_id);[m
+[31m-      setConfirmFailedData({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderData });[m
+[31m-      setError('Payment received but confirmation failed. Please use the button below to retry.');[m
+[31m-      setLoading(false);[m
+[31m-      setLoadingStatus('');[m
+[32m+[m[32m      setError([m
+[32m+[m[32m        'Payment received but confirmation failed. Please use the button below to retry.',[m
+[32m+[m[32m      );[m
+[32m+[m[32m      setProcessing(false);[m
+[32m+[m[32m      setStatusText('');[m
+       return;[m
+     }[m
+ [m
+[31m-    if (verifyData.success) {[m
+[32m+[m[32m    if (json?.success) {[m
+       console.log('[payment] Verification successful, redirecting');[m
+[31m-      setLoadingStatus('Redirecting…');[m
+[31m-      // For iiskills: prefer redirect_url returned by iiskills-cloud confirm[m
+[31m-      const returnUrl =[m
+[31m-        verifyData.redirect_url ||[m
+[31m-        verifyData.return_url ||[m
+[31m-        (orderData && orderData.return_url);[m
+[31m-      if (returnUrl) {[m
+[31m-        const sep = returnUrl.includes('?') ? '&' : '?';[m
+[31m-        const sessionId = verifyData.session_id || (orderData && orderData.session_id);[m
+[32m+[m[32m      setStatusText('Redirecting…');[m
+[32m+[m
+[32m+[m[32m      const redirect =[m
+[32m+[m[32m        json.redirect_url || json.return_url || (orderData && orderData.return_url);[m
+[32m+[m
+[32m+[m[32m      if (redirect) {[m
+[32m+[m[32m        const join = redirect.includes('?') ? '&' : '?';[m
+[32m+[m[32m        const sessionId = json.session_id || (orderData && orderData.session_id);[m
+[32m+[m
+         window.location.href = sessionId[m
+[31m-          ? `${returnUrl}${sep}session_id=${encodeURIComponent(sessionId)}&status=success`[m
+[31m-          : `${returnUrl}${sep}status=success`;[m
+[32m+[m[32m          ? `${redirect}${join}session_id=${encodeURIComponent(sessionId)}&status=success`[m
+[32m+[m[32m          : `${redirect}${join}status=success`;[m
+       } else {[m
+         router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);[m
+       }[m
+[31m-    } else {[m
+[31m-      console.error('[payment] Verification failed:', verifyData);[m
+[31m-      setError('Payment verification failed. Please contact support with your payment ID: ' + razorpay_payment_id);[m
+[31m-      setLoading(false);[m
+[31m-      setLoadingStatus('');[m
+[32m+[m[32m      return;[m
+     }[m
+[32m+[m
+[32m+[m[32m    console.error('[payment] Verification failed:', json);[m
+[32m+[m[32m    setError([m
+[32m+[m[32m      `Payment verification failed. Please contact support with your payment ID: ${razorpay_payment_id}`,[m
+[32m+[m[32m    );[m
+[32m+[m[32m    setProcessing(false);[m
+[32m+[m[32m    setStatusText('');[m
+   };[m
+ [m
+[31m-  /**[m
+[31m-   * Retry the iiskills-cloud confirm call after a prior failure.[m
+[31m-   * Re-uses the stored Razorpay response so the payload is identical.[m
+[31m-   */[m
+[31m-  const handleRetryConfirm = async () => {[m
+[31m-    if (!confirmFailedData) return;[m
+[31m-    setLoading(true);[m
+[31m-    setLoadingStatus('Retrying confirmation…');[m
+[32m+[m[32m  const retryConfirmation = async () => {[m
+[32m+[m[32m    if (!confirmRetryPayload) return;[m
+[32m+[m[32m    setProcessing(true);[m
+[32m+[m[32m    setStatusText('Retrying confirmation…');[m
+     setError('');[m
+[31m-    await handleVerifyPayment(confirmFailedData);[m
+[32m+[m[32m    await verifyPayment(confirmRetryPayload);[m
+   };[m
+ [m
+[31m-[m
+[31m-  // For token-based segments (jaibharat, jaikisan): show error if token is missing/invalid.[m
+[31m-  // For course-based segments (iiskills): skip the user_id check; course validity governs rendering.[m
+[31m-  const shouldShowError =[m
+[31m-    tokenError ||[m
+[31m-    (!tokenPayload && !user_id && !allowedCourses && typeof window !== 'undefined' && router.isReady);[m
+[31m-[m
+[31m-  if (shouldShowError) {[m
+[31m-[m
+[32m+[m[32m  // Render guards[m
+[32m+[m[32m  if (tokenError) {[m
+     return ([m
+       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgGradient }}>[m
+[31m-        <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: '400px' }}>[m
+[32m+[m[32m        <div style={{ background: 'white', borderRadius: 16, padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: 400 }}>[m
+           <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.95rem' }}>[m
+             {tokenError || `Invalid payment link. Please open from ${originDomain}.`}[m
+           </p>[m
+[36m@@ -352,6 +396,12 @@[m [mexport default function SegmentPaymentPage({[m
+     );[m
+   }[m
+ [m
+[32m+[m[32m  // Basic page shell (kept consistent with your existing UI approach)[m
+[32m+[m[32m  const disablePay =[m
+[32m+[m[32m    processing ||[m
+[32m+[m[32m    !courseAllowed ||[m
+[32m+[m[32m    (allowedCourses && (!course || !canSubmitCustomerDetails));[m
+[32m+[m
+   return ([m
+     <>[m
+       <Head>[m
+[36m@@ -359,57 +409,63 @@[m [mexport default function SegmentPaymentPage({[m
+         <meta name="viewport" content="width=device-width, initial-scale=1.0" />[m
+       </Head>[m
+ [m
+[31m-      <style jsx global>{`[m
+[31m-        * { margin: 0; padding: 0; box-sizing: border-box; }[m
+[31m-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }[m
+[31m-      `}</style>[m
+[31m-[m
+[31m-      <div style={{[m
+[31m-        minHeight: '100vh',[m
+[31m-        background: bgGradient,[m
+[31m-        display: 'flex',[m
+[31m-        alignItems: 'center',[m
+[31m-        justifyContent: 'center',[m
+[31m-        padding: '1rem',[m
+[31m-      }}>[m
+[31m-        <div style={{[m
+[31m-          maxWidth: '420px',[m
+[31m-          width: '100%',[m
+[31m-          background: 'white',[m
+[31m-          borderRadius: '20px',[m
+[31m-          boxShadow: '0 20px 60px rgba(0,0,0,0.12)',[m
+[31m-          padding: '2rem',[m
+[31m-        }}>[m
+[31m-          {/* Header */}[m
+[32m+[m[32m      <div[m
+[32m+[m[32m        style={{[m
+[32m+[m[32m          minHeight: '100vh',[m
+[32m+[m[32m          background: bgGradient,[m
+[32m+[m[32m          display: 'flex',[m
+[32m+[m[32m          alignItems: 'center',[m
+[32m+[m[32m          justifyContent: 'center',[m
+[32m+[m[32m          padding: '1rem',[m
+[32m+[m[32m        }}[m
+[32m+[m[32m      >[m
+[32m+[m[32m        <div[m
+[32m+[m[32m          style={{[m
+[32m+[m[32m            maxWidth: 420,[m
+[32m+[m[32m            width: '100%',[m
+[32m+[m[32m            background: 'white',[m
+[32m+[m[32m            borderRadius: 20,[m
+[32m+[m[32m            boxShadow: '0 20px 60px rgba(0,0,0,0.12)',[m
+[32m+[m[32m            padding: '2rem',[m
+[32m+[m[32m          }}[m
+[32m+[m[32m        >[m
+           <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>[m
+[31m-            <div style={{[m
+[31m-              width: '72px', height: '72px',[m
+[31m-              background: iconBg,[m
+[31m-              borderRadius: '50%',[m
+[31m-              display: 'flex', alignItems: 'center', justifyContent: 'center',[m
+[31m-              margin: '0 auto 1rem',[m
+[31m-              fontSize: '2.5rem',[m
+[31m-            }}>{emoji}</div>[m
+[31m-            <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: titleColor, marginBottom: '0.25rem' }}>[m
+[32m+[m[32m            <div[m
+[32m+[m[32m              style={{[m
+[32m+[m[32m                width: 72,[m
+[32m+[m[32m                height: 72,[m
+[32m+[m[32m                background: iconBg,[m
+[32m+[m[32m                borderRadius: '50%',[m
+[32m+[m[32m                display: 'flex',[m
+[32m+[m[32m                alignItems: 'center',[m
+[32m+[m[32m                justifyContent: 'center',[m
+[32m+[m[32m                margin: '0 auto 1rem',[m
+[32m+[m[32m                fontSize: '2.5rem',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+[32m+[m[32m              {emoji}[m
+[32m+[m[32m            </div>[m
+[32m+[m
+[32m+[m[32m            <h1 style={{ fontSize: '1.8rem', fontWeight: 700, color: titleColor, marginBottom: '0.25rem' }}>[m
+               {brandName}[m
+             </h1>[m
+             <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Complete Your Payment</p>[m
+           </div>[m
+ [m
+[31m-          {/* Course dropdown (shown for course-based segments like iiskills) */}[m
+           {allowedCourses && router.isReady && ([m
+             <div style={{ marginBottom: '1.5rem' }}>[m
+[31m-              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: '500' }}>[m
+[32m+[m[32m              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>[m
+                 Select your course:[m
+               </p>[m
+[32m+[m
+               <select[m
+                 value={course}[m
+                 onChange={(e) => setSelectedCourse(e.target.value)}[m
+                 style={{[m
+                   width: '100%',[m
+                   padding: '0.75rem',[m
+[31m-                  borderRadius: '8px',[m
+[31m-                  border: `1px solid ${isCourseValid ? '#d1d5db' : '#f87171'}`,[m
+[32m+[m[32m                  borderRadius: 8,[m
+[32m+[m[32m                  border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`,[m
+                   fontSize: '0.95rem',[m
+                   color: '#374151',[m
+                   background: 'white',[m
+[36m@@ -418,10 +474,13 @@[m [mexport default function SegmentPaymentPage({[m
+               >[m
+                 <option value="">-- Select a course --</option>[m
+                 {allowedCourses.map((c) => ([m
+[31m-                  <option key={c} value={c}>{COURSE_LABELS[c] || c}</option>[m
+[32m+[m[32m                  <option key={c} value={c}>[m
+[32m+[m[32m                    {COURSE_LABELS[c] || c}[m
+[32m+[m[32m                  </option>[m
+                 ))}[m
+               </select>[m
+[31m-              {!isCourseValid && course === '' && ([m
+[32m+[m
+[32m+[m[32m              {!courseAllowed && course === '' && ([m
+                 <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>[m
+                   Please select a course to continue.[m
+                 </p>[m
+[36m@@ -429,12 +488,13 @@[m [mexport default function SegmentPaymentPage({[m
+             </div>[m
+           )}[m
+ [m
+[31m-          {/* Name and Phone fields (shown for course-based segments like iiskills) */}[m
+           {allowedCourses && router.isReady && ([m
+             <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>[m
+               <div style={{ display: 'flex', gap: '0.5rem' }}>[m
+                 <div style={{ flex: 1 }}>[m
+[31m-                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>First Name *</p>[m
+[32m+[m[32m                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>[m
+[32m+[m[32m                    First Name *[m
+[32m+[m[32m                  </p>[m
+                   <input[m
+                     type="text"[m
+                     value={firstName}[m
+[36m@@ -443,15 +503,18 @@[m [mexport default function SegmentPaymentPage({[m
+                     style={{[m
+                       width: '100%',[m
+                       padding: '0.65rem',[m
+[31m-                      borderRadius: '8px',[m
+[32m+[m[32m                      borderRadius: 8,[m
+                       border: '1px solid #d1d5db',[m
+                       fontSize: '0.9rem',[m
+                       color: '#374151',[m
+                     }}[m
+                   />[m
+                 </div>[m
+[32m+[m
+                 <div style={{ flex: 1 }}>[m
+[31m-                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>Last Name *</p>[m
+[32m+[m[32m                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>[m
+[32m+[m[32m                    Last Name *[m
+[32m+[m[32m                  </p>[m
+                   <input[m
+                     type="text"[m
+                     value={lastName}[m
+[36m@@ -460,7 +523,7 @@[m [mexport default function SegmentPaymentPage({[m
+                     style={{[m
+                       width: '100%',[m
+                       padding: '0.65rem',[m
+[31m-                      borderRadius: '8px',[m
+[32m+[m[32m                      borderRadius: 8,[m
+                       border: '1px solid #d1d5db',[m
+                       fontSize: '0.9rem',[m
+                       color: '#374151',[m
+[36m@@ -468,23 +531,30 @@[m [mexport default function SegmentPaymentPage({[m
+                   />[m
+                 </div>[m
+               </div>[m
+[32m+[m
+               <div>[m
+[31m-                <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: '500' }}>Phone Number * (10 digits)</p>[m
+[32m+[m[32m                <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>[m
+[32m+[m[32m                  Phone Number * (10 digits)[m
+[32m+[m[32m                </p>[m
+                 <input[m
+                   type="tel"[m
+                   value={phone}[m
+[31m-                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}[m
+[32m+[m[32m                  onChange={(e) =>[m
+[32m+[m[32m                    setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))[m
+[32m+[m[32m                  }[m
+                   placeholder="10-digit mobile number"[m
+                   style={{[m
+                     width: '100%',[m
+                     padding: '0.65rem',[m
+[31m-                    borderRadius: '8px',[m
+[31m-                    border: `1px solid ${phone && !PHONE_REGEX.test(phone) ? '#f87171' : '#d1d5db'}`,[m
+[32m+[m[32m                    borderRadius: 8,[m
+[32m+[m[32m                    border: `1px solid ${[m
+[32m+[m[32m                      phone && !PHONE_RE.test(phone) ? '#f87171' : '#d1d5db'[m
+[32m+[m[32m                    }`,[m
+                     fontSize: '0.9rem',[m
+                     color: '#374151',[m
+                   }}[m
+                 />[m
+[31m-                {phone && !PHONE_REGEX.test(phone) && ([m
+[32m+[m[32m                {phone && !PHONE_RE.test(phone) && ([m
+                   <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>[m
+                     Please enter a valid 10-digit phone number.[m
+                   </p>[m
+[36m@@ -493,102 +563,113 @@[m [mexport default function SegmentPaymentPage({[m
+             </div>[m
+           )}[m
+ [m
+[31m-          {/* Pricing Box */}[m
+[31m-          <div style={{[m
+[31m-            background: accentGradient,[m
+[31m-            borderRadius: '16px',[m
+[31m-            padding: '1.5rem',[m
+[31m-            marginBottom: '1.5rem',[m
+[31m-            color: 'white',[m
+[31m-          }}>[m
+[31m-            <p style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.85, marginBottom: '0.5rem' }}>[m
+[32m+[m[32m          <div[m
+[32m+[m[32m            style={{[m
+[32m+[m[32m              background: accentGradient,[m
+[32m+[m[32m              borderRadius: 16,[m
+[32m+[m[32m              padding: '1.5rem',[m
+[32m+[m[32m              marginBottom: '1.5rem',[m
+[32m+[m[32m              color: 'white',[m
+[32m+[m[32m            }}[m
+[32m+[m[32m          >[m
+[32m+[m[32m            <p[m
+[32m+[m[32m              style={{[m
+[32m+[m[32m                fontSize: '0.75rem',[m
+[32m+[m[32m                textTransform: 'uppercase',[m
+[32m+[m[32m                letterSpacing: '0.05em',[m
+[32m+[m[32m                opacity: 0.85,[m
+[32m+[m[32m                marginBottom: '0.5rem',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+               {validityLabel}[m
+             </p>[m
+[32m+[m
+             <div style={{ marginBottom: '0.25rem' }}>[m
+[31m-              <span style={{ fontSize: '3rem', fontWeight: '700' }}>₹116.82</span>[m
+[32m+[m[32m              <span style={{ fontSize: '3rem', fontWeight: 700 }}>₹116.82</span>[m
+             </div>[m
+[31m-            <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>(₹99 + 18% GST)</p>[m
+[32m+[m
+[32m+[m[32m            <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>[m
+[32m+[m[32m              (₹99 + 18% GST)[m
+[32m+[m[32m            </p>[m
+ [m
+             <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '1rem' }}>[m
+               ✅ Valid for {validityText}[m
+             </p>[m
+ [m
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.85rem' }}>[m
+[31m-              {features.map((feature) => ([m
+[31m-                <div key={feature} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>[m
+[32m+[m[32m              {features.map((f) => ([m
+[32m+[m[32m                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>[m
+                   <span>✓</span>[m
+[31m-                  <span>{feature}</span>[m
+[32m+[m[32m                  <span>{f}</span>[m
+                 </div>[m
+               ))}[m
+             </div>[m
+           </div>[m
+ [m
+[31m-          {/* Pay Button */}[m
+           <button[m
+[31m-            onClick={handlePayment}[m
+[31m-            disabled={loading || !isCourseValid || !isNamePhoneValid}[m
+[32m+[m[32m            onClick={startPayment}[m
+[32m+[m[32m            disabled={disablePay}[m
+             style={{[m
+               width: '100%',[m
+[31m-              background: (loading || !isCourseValid || !isNamePhoneValid) ? accentDisabled : accentColor,[m
+[31m-              color: 'white',[m
+[31m-              border: 'none',[m
+[31m-              borderRadius: '12px',[m
+               padding: '1rem',[m
+[31m-              fontSize: '1.1rem',[m
+[31m-              fontWeight: '700',[m
+[31m-              cursor: (loading || !isCourseValid || !isNamePhoneValid) ? 'not-allowed' : 'pointer',[m
+[31m-              marginBottom: '1rem',[m
+[31m-              transition: 'background 0.2s',[m
+[32m+[m[32m              borderRadius: 12,[m
+[32m+[m[32m              border: 'none',[m
+[32m+[m[32m              background: processing ? accentDisabled : accentColor,[m
+[32m+[m[32m              color: 'white',[m
+[32m+[m[32m              fontSize: '1.05rem',[m
+[32m+[m[32m              fontWeight: 700,[m
+[32m+[m[32m              cursor: disablePay ? 'not-allowed' : 'pointer',[m
+[32m+[m[32m              transition: '0.2s',[m
+[32m+[m[32m              marginBottom: '0.75rem',[m
+             }}[m
+           >[m
+[31m-            {loading ? (loadingStatus || 'Processing…') : 'Pay ₹116.82'}[m
+[32m+[m[32m            {processing ? statusText || 'Processing…' : 'Pay ₹116.82'}[m
+           </button>[m
+ [m
+[32m+[m[32m          {confirmRetryPayload && ([m
+[32m+[m[32m            <button[m
+[32m+[m[32m              onClick={retryConfirmation}[m
+[32m+[m[32m /etc/</div>             disabled={processing}[m
+[32m+[m[32m              style={{[m
+[32m+[m[32m                width: '100%',[m
+[32m+[m[32m                padding: '0.9rem',[m
+[32m+[m[32m                borderRadius: 12,[m
+[32m+[m[32m                border: `2px solid ${accentColor}`,[m
+[32m+[m[32m                background: 'transparent',[m
+[32m+[m[32m                color: accentColor,[m
+[32m+[m[32m                fontSize: '1rem',[m
+[32m+[m[32m                fontWeight: 700,[m
+[32m+[m[32m                cursor: processing ? 'not-allowed' : 'pointer',[m
+[32m+[m[32m                transition: '0.2s',[m
+[32m+[m[32m                marginBottom: '0.75rem',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+[32m+[m[32m              {processing ? statusText || 'Retrying…' : 'Retry Confirmation'}[m
+[32m+[m[32m            </button>[m
+[32m+[m[32m          )}[m
+[32m+[m
+           {error && ([m
+[31m-            <div style={{[m
+[31m-              background: '#fef2f2',[m
+[31m-              border: '1px solid #fecaca',[m
+[31m-              color: '#991b1b',[m
+[31m-              borderRadius: '8px',[m
+[31m-              padding: '0.75rem',[m
+[31m-              marginBottom: '1rem',[m
+[31m-              fontSize: '0.85rem',[m
+[31m-            }}>[m
+[32m+[m[32m            <div[m
+[32m+[m[32m              style={{[m
+[32m+[m[32m                background: '#fef2f2',[m
+[32m+[m[32m                border: '1px solid #fecaca',[m
+[32m+[m[32m                borderRadius: 12,[m
+[32m+[m[32m                padding: '0.9rem',[m
+[32m+[m[32m                color: '#dc2626',[m
+[32m+[m[32m                fontSize: '0.9rem',[m
+[32m+[m[32m                textAlign: 'center',[m
+[32m+[m[32m                marginBottom: '0.5rem',[m
+[32m+[m[32m              }}[m
+[32m+[m[32m            >[m
+               {error}[m
+[31m-              {confirmFailedData && ([m
+[31m-                <button[m
+[31m-                  onClick={handleRetryConfirm}[m
+[31m-                  disabled={loading}[m
+[31m-                  style={{[m
+[31m-                    display: 'block',[m
+[31m-                    marginTop: '0.75rem',[m
+[31m-                    background: accentColor,[m
+[31m-                    color: 'white',[m
+[31m-                    border: 'none',[m
+[31m-                    borderRadius: '8px',[m
+[31m-                    padding: '0.5rem 1rem',[m
+[31m-                    fontSize: '0.85rem',[m
+[31m-                    fontWeight: '600',[m
+[31m-                    cursor: loading ? 'not-allowed' : 'pointer',[m
+[31m-                  }}[m
+[31m-                >[m
+[31m-                  {loading ? (loadingStatus || 'Retrying…') : 'Retry Confirmation'}[m
+[31m-                </button>[m
+[31m-              )}[m
+             </div>[m
+           )}[m
+ [m
+[31m-          {/* Footer */}[m
+[31m-          <div style={{ textAlign: 'center' }}>[m
+[31m-            <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.5rem' }}>🔒 Secured by Razorpay</p>[m
+[31m-            <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', fontSize: '0.75rem', color: '#6b7280' }}>[m
+[31m-              <span>💳 Cards</span>[m
+[31m-              <span>📱 UPI</span>[m
+[31m-              <span>🏦 Net Banking</span>[m
+[31m-            </div>[m
+[31m-          </div>[m
+[32m+[m[32m          <p style={{ color: '#9ca3af', fontSize: '0.8rem', textAlign: 'center' }}>[m
+[32m+[m[32m            Secured by Razorpay • SSL Encrypted[m
+[32m+[m[32m          </p>[m
+         </div>[m
+       </div>[m
+     </>[m
+   );[m
+[31m-}[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/ecosystem.config.js b/ecosystem.config.js[m
+[1mindex 86d919b..c3aea0b 100644[m
+[1m--- a/ecosystem.config.js[m
+[1m+++ b/ecosystem.config.js[m
+[36m@@ -1,35 +1,17 @@[m
+[31m-/**[m
+[31m- * PM2 Ecosystem Configuration for AI Cloud Enterprises[m
+[31m- * [m
+[31m- * This file defines the PM2 configuration for running the Next.js application[m
+[31m- * in production. It ensures consistent deployment across environments.[m
+[31m- * [m
+[31m- * Usage:[m
+[31m- *   pm2 start ecosystem.config.js          - Start the application[m
+[31m- *   pm2 restart ecosystem.config.js        - Restart the application[m
+[31m- *   pm2 stop ecosystem.config.js           - Stop the application[m
+[31m- *   pm2 delete ecosystem.config.js         - Delete the application from PM2[m
+[31m- */[m
+[31m-[m
+ module.exports = {[m
+   apps: [[m
+     {[m
+       name: "ai-enter",[m
+       cwd: "/var/www/ai-enter",[m
+[31m-      script: "npm",[m
+[31m-      args: "start",[m
+[31m-      interpreter: "none",[m
+[31m-      env: {[m
+[31m-        NODE_ENV: "production",[m
+[31m-        PORT: 3040[m
+[31m-      },[m
+[32m+[m[32m      script: "/var/www/ai-enter/pm2-start.sh",[m
+[32m+[m[32m      interpreter: "bash",[m
+       instances: 1,[m
+       autorestart: true,[m
+       watch: false,[m
+       max_memory_restart: "2G",[m
+[31m-      min_uptime: "10s",           // Don't restart if crashes within 10s[m
+[31m-      max_restarts: 5,              // Max 5 restarts in a window[m
+[31m-      restart_delay: 4000,          // Wait 4s before restarting[m
+[32m+[m[32m      min_uptime: "10s",[m
+[32m+[m[32m      max_restarts: 5,[m
+[32m+[m[32m      restart_delay: 4000,[m
+       error_file: "/var/www/ai-enter/logs/aienter-error.log",[m
+       out_file: "/var/www/ai-enter/logs/aienter-out.log",[m
+       log_file: "/var/www/ai-enter/logs/aienter-combined.log",[m
+[1mdiff --git a/lib/verifyIiskillsToken.js b/lib/verifyIiskillsToken.js[m
+[1mindex 1036bdd..0877789 100644[m
+[1m--- a/lib/verifyIiskillsToken.js[m
+[1m+++ b/lib/verifyIiskillsToken.js[m
+[36m@@ -5,19 +5,32 @@[m [mimport { IISKILLS_ALLOWED_COURSES } from './courses';[m
+  * Verify a standard JWT (HS256) token issued by iiskills-cloud.[m
+  *[m
+  * The token is a standard JWT signed with HMAC-SHA256 using the secret stored[m
+[31m- * in IISKILLS_PAYMENT_TOKEN_SECRET.  Expected payload fields:[m
+[31m- *   - purchaseId  {string}  unique purchase ID from iiskills-cloud[m
+[31m- *   - user_id     {string}  (optional) iiskills user identifier[m
+[31m- *   - phone       {string}  (optional) user phone number[m
+[31m- *   - name        {string}  (optional) user display name[m
+[31m- *   - course_slug {string}  course identifier (must be in IISKILLS_ALLOWED_COURSES)[m
+[31m- *   - appId       {string}  alternative field name for course_slug[m
+[31m- *   - return_to   {string}  URL to redirect the user after payment[m
+[31m- *   - exp         {number}  Unix timestamp expiry[m
+[32m+[m[32m * in IISKILLS_PAYMENT_TOKEN_SECRET.[m
+  *[m
+[31m- * Returns the decoded payload on success, throws an Error on failure.[m
+[32m+[m[32m * Expected payload fields (token may vary by version):[m
+[32m+[m[32m *   - purchaseId   {string}  unique purchase ID from iiskills-cloud[m
+[32m+[m[32m *   - purchase_id  {string}  (alt) unique purchase ID from iiskills-cloud[m
+[32m+[m[32m *   - course_slug  {string}  course identifier (must be in IISKILLS_ALLOWED_COURSES)[m
+[32m+[m[32m *   - appId        {string}  alternative field name for course_slug[m
+[32m+[m[32m *   - courseSlug   {string}  alternative field name for course_slug[m
+[32m+[m[32m *   - user_id      {string}  (optional) iiskills user identifier[m
+[32m+[m[32m *   - phone        {string}  (optional) user phone number[m
+[32m+[m[32m *   - name         {string}  (optional) user display name[m
+[32m+[m[32m *   - return_to    {string}  (optional) URL to redirect the user after payment[m
+[32m+[m[32m *   - exp          {number}  Unix timestamp expiry[m
+[32m+[m[32m *[m
+[32m+[m[32m * Behavior:[m
+[32m+[m[32m * - Verifies HS256 signature.[m
+[32m+[m[32m * - Enforces expiry.[m
+[32m+[m[32m * - Validates course slug against IISKILLS_ALLOWED_COURSES.[m
+[32m+[m[32m * - Ensures a purchaseId exists, either from the token payload OR (optionally)[m
+[32m+[m[32m *   from a trusted external value (e.g., query string) passed as expectedPurchaseId.[m
+[32m+[m[32m *[m
+[32m+[m[32m * Returns the normalized decoded payload on success, throws an Error on failure.[m
+  */[m
+[31m-export function verifyIiskillsToken(token) {[m
+[32m+[m[32mexport function verifyIiskillsToken(token, opts = {}) {[m
+[32m+[m[32m  const { expectedPurchaseId } = opts;[m
+[32m+[m
+   const secret = process.env.IISKILLS_PAYMENT_TOKEN_SECRET;[m
+   if (!secret) {[m
+     throw new Error('IISKILLS_PAYMENT_TOKEN_SECRET is not configured');[m
+[36m@@ -71,11 +84,22 @@[m [mexport function verifyIiskillsToken(token) {[m
+     throw new Error('Token has expired');[m
+   }[m
+ [m
+[31m-  // Require purchaseId[m
+[31m-  if (!payload.purchaseId) {[m
+[32m+[m[32m  // Normalize purchaseId (token may use purchaseId or purchase_id).[m
+[32m+[m[32m  const tokenPurchaseId = payload.purchaseId || payload.purchase_id;[m
+[32m+[m
+[32m+[m[32m  // Require purchaseId:[m
+[32m+[m[32m  // - Prefer token claim[m
+[32m+[m[32m  // - Allow fallback from expectedPurchaseId (e.g. query param), if provided[m
+[32m+[m[32m  const purchaseId = tokenPurchaseId || expectedPurchaseId;[m
+[32m+[m[32m  if (!purchaseId) {[m
+     throw new Error('Token missing purchaseId');[m
+   }[m
+ [m
+[32m+[m[32m  // If both exist, they must match[m
+[32m+[m[32m  if (tokenPurchaseId && expectedPurchaseId && tokenPurchaseId !== expectedPurchaseId) {[m
+[32m+[m[32m    throw new Error('Token purchaseId mismatch');[m
+[32m+[m[32m  }[m
+[32m+[m
+   // Resolve course slug (iiskills-cloud may send course_slug or appId)[m
+   const courseSlug = payload.course_slug || payload.appId || payload.courseSlug;[m
+   if (!courseSlug) {[m
+[36m@@ -85,5 +109,9 @@[m [mexport function verifyIiskillsToken(token) {[m
+     throw new Error(`Invalid course in token: ${courseSlug}`);[m
+   }[m
+ [m
+[31m-  return { ...payload, courseSlug };[m
+[31m-}[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    ...payload,[m
+[32m+[m[32m    purchaseId, // normalized[m
+[32m+[m[32m    courseSlug,[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/pages/api/create-order.js b/pages/api/create-order.js[m
+[1mindex 504f6b0..407a0bd 100644[m
+[1m--- a/pages/api/create-order.js[m
+[1m+++ b/pages/api/create-order.js[m
+[36m@@ -21,8 +21,8 @@[m [mexport default async function handler(req, res) {[m
+ [m
+     // Check if Razorpay credentials are set[m
+     if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {[m
+[31m-      return res.status(500).json({ [m
+[31m-        error: 'Payment system not configured. Please contact administrator.' [m
+[32m+[m[32m      return res.status(500).json({[m
+[32m+[m[32m        error: 'Payment system not configured. Please contact administrator.',[m
+       });[m
+     }[m
+ [m
+[36m@@ -32,7 +32,7 @@[m [mexport default async function handler(req, res) {[m
+     // Initialize Razorpay[m
+     const razorpay = new Razorpay({[m
+       key_id: process.env.RAZORPAY_KEY_ID,[m
+[31m-      key_secret: process.env.RAZORPAY_KEY_SECRET[m
+[32m+[m[32m      key_secret: process.env.RAZORPAY_KEY_SECRET,[m
+     });[m
+ [m
+     // Create order[m
+[36m@@ -47,8 +47,8 @@[m [mexport default async function handler(req, res) {[m
+         customerPhone: customerPhone,[m
+         basePrice: feeInfo.displayBase,[m
+         gst: feeInfo.displayGst,[m
+[31m-        total: feeInfo.displayTotal[m
+[31m-      }[m
+[32m+[m[32m        total: feeInfo.displayTotal,[m
+[32m+[m[32m      },[m
+     };[m
+ [m
+     const order = await razorpay.orders.create(options);[m
+[36m@@ -58,12 +58,12 @@[m [mexport default async function handler(req, res) {[m
+       amount: order.amount,[m
+       currency: order.currency,[m
+       keyId: process.env.RAZORPAY_KEY_ID,[m
+[31m-      feeInfo: feeInfo[m
+[32m+[m[32m      feeInfo: feeInfo,[m
+     });[m
+   } catch (error) {[m
+     console.error('Error creating order:', error);[m
+[31m-    res.status(500).json({ [m
+[31m-      error: 'Unable to process payment. Please try again.'[m
+[32m+[m[32m    res.status(500).json({[m
+[32m+[m[32m      error: 'Unable to process payment. Please try again.',[m
+     });[m
+   }[m
+[31m-}[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/pages/api/payments/create-order.js b/pages/api/payments/create-order.js[m
+[1mindex 905a1fc..045c910 100644[m
+[1m--- a/pages/api/payments/create-order.js[m
+[1m+++ b/pages/api/payments/create-order.js[m
+[36m@@ -5,31 +5,47 @@[m [mimport { verifyHandoffToken } from '../../../lib/verifyHandoffToken';[m
+ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';[m
+ import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';[m
+ [m
+[31m-[m
+ export default async function handler(req, res) {[m
+   if (req.method !== 'POST') {[m
+     return res.status(405).json({ error: 'Method not allowed' });[m
+   }[m
+ [m
+[31m-  let user_id, app_name, user_email, user_phone, customer_name, session_id, amount_paise, currency, validity_days, return_url, course;[m
+[32m+[m[32m  let user_id,[m
+[32m+[m[32m    app_name,[m
+[32m+[m[32m    user_email,[m
+[32m+[m[32m    user_phone,[m
+[32m+[m[32m    customer_name,[m
+[32m+[m[32m    session_id,[m
+[32m+[m[32m    amount_paise,[m
+[32m+[m[32m    currency,[m
+[32m+[m[32m    validity_days,[m
+[32m+[m[32m    return_url,[m
+[32m+[m[32m    course;[m
+ [m
+   if (req.body.iiskills_token) {[m
+     // New iiskills JWT flow: token issued by iiskills-cloud, verified with IISKILLS_PAYMENT_TOKEN_SECRET[m
+     let payload;[m
+     try {[m
+[31m-      payload = verifyIiskillsToken(req.body.iiskills_token);[m
+[32m+[m[32m      // IMPORTANT: token may omit purchaseId; accept it from request body (from query string)[m
+[32m+[m[32m      payload = verifyIiskillsToken(req.body.iiskills_token, {[m
+[32m+[m[32m        expectedPurchaseId: req.body.purchaseId,[m
+[32m+[m[32m      });[m
+     } catch (err) {[m
+       return res.status(400).json({ error: err.message || 'Invalid iiskills token' });[m
+     }[m
+[32m+[m
+     user_id = payload.user_id || null;[m
+     user_phone = payload.phone || payload.user_phone || null;[m
+     customer_name = payload.name || payload.customer_name || null;[m
+     app_name = 'iiskills';[m
+     course = payload.courseSlug;[m
+[32m+[m
+     amount_paise = payload.amount_paise || payload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;[m
+     currency = payload.currency || 'INR';[m
+     validity_days = payload.validity_days || 365;[m
+     return_url = payload.return_to || payload.return_url || null;[m
+[32m+[m
+[32m+[m[32m    // For iiskills, session_id == purchaseId[m
+     session_id = payload.purchaseId;[m
+   } else if (req.body.session_token) {[m
+     // Token-based flow (jai-bharat, jai-kisan)[m
+[36m@@ -48,6 +64,7 @@[m [mexport default async function handler(req, res) {[m
+     currency = payload.currency;[m
+     validity_days = payload.validity_days;[m
+     return_url = payload.return_url;[m
+[32m+[m
+     // course passed alongside token (course selected on the payment page)[m
+     if (req.body.course !== undefined) {[m
+       course = req.body.course;[m
+[36m@@ -55,7 +72,9 @@[m [mexport default async function handler(req, res) {[m
+         return res.status(400).json({ error: 'Invalid course value' });[m
+       }[m
+       if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {[m
+[31m-        return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });[m
+[32m+[m[32m        return res[m
+[32m+[m[32m          .status(400)[m
+[32m+[m[32m          .json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });[m
+       }[m
+     }[m
+   } else {[m
+[36m@@ -65,7 +84,9 @@[m [mexport default async function handler(req, res) {[m
+       return res.status(400).json({ error: 'Invalid course value' });[m
+     }[m
+     if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {[m
+[31m-      return res.status(400).json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });[m
+[32m+[m[32m      return res.status(400).json({[m
+[32m+[m[32m        error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', '),[m
+[32m+[m[32m      });[m
+     }[m
+   }[m
+ [m
+[36m@@ -73,15 +94,64 @@[m [mexport default async function handler(req, res) {[m
+     return res.status(500).json({ error: 'Payment system not configured' });[m
+   }[m
+ [m
+[32m+[m[32m  // Supabase (optional but enables idempotency + "already paid" protection)[m
+[32m+[m[32m  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;[m
+[32m+[m[32m  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;[m
+[32m+[m[32m  const supabase =[m
+[32m+[m[32m    supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;[m
+[32m+[m
+   try {[m
+[32m+[m[32m    // --- Idempotency / reuse protection (requires Supabase configured) ---[m
+[32m+[m[32m    if (supabase && app_name && session_id) {[m
+[32m+[m[32m      // Find latest transaction for this app_name + session_id[m
+[32m+[m[32m      const { data: existing, error: existingErr } = await supabase[m
+[32m+[m[32m        .from('payment_transactions')[m
+[32m+[m[32m        .select('id, razorpay_order_id, status, amount, currency, return_url')[m
+[32m+[m[32m        .eq('app_name', app_name)[m
+[32m+[m[32m        .eq('session_id', session_id)[m
+[32m+[m[32m        .order('created_at', { ascending: false })[m
+[32m+[m[32m        .limit(1);[m
+[32m+[m
+[32m+[m[32m      if (existingErr) {[m
+[32m+[m[32m        // Non-fatal: continue with fresh order, but log it.[m
+[32m+[m[32m        console.error('[create-order] Supabase lookup failed (non-fatal):', existingErr.message);[m
+[32m+[m[32m      } else if (existing && existing.length > 0) {[m
+[32m+[m[32m        const row = existing[0];[m
+[32m+[m
+[32m+[m[32m        // If already paid, do not allow reusing the same purchase/session link[m
+[32m+[m[32m        if (row.status === 'paid') {[m
+[32m+[m[32m          return res.status(409).json({[m
+[32m+[m[32m            error: 'This payment link has already been used. Please start a new purchase.',[m
+[32m+[m[32m          });[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        // If there is already a pending order, reuse it (do NOT create new order)[m
+[32m+[m[32m        if (row.status === 'pending' && row.razorpay_order_id) {[m
+[32m+[m[32m          return res.status(200).json({[m
+[32m+[m[32m            orderId: row.razorpay_order_id,[m
+[32m+[m[32m            amount: Math.round((row.amount || (amount_paise || 11682) / 100) * 100), // paise[m
+[32m+[m[32m            currency: row.currency || currency || 'INR',[m
+[32m+[m[32m            keyId: process.env.RAZORPAY_KEY_ID,[m
+[32m+[m[32m            session_id,[m
+[32m+[m[32m            return_url: row.return_url || return_url || null,[m
+[32m+[m[32m            reused: true,[m
+[32m+[m[32m          });[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // --- Create a new Razorpay order ---[m
+     const razorpay = new Razorpay({[m
+       key_id: process.env.RAZORPAY_KEY_ID,[m
+       key_secret: process.env.RAZORPAY_KEY_SECRET,[m
+     });[m
+ [m
+[32m+[m[32m    const finalAmountPaise = amount_paise || 11682;[m
+[32m+[m[32m    const finalCurrency = currency || 'INR';[m
+[32m+[m
+     const order = await razorpay.orders.create({[m
+[31m-      amount: amount_paise || 11682,[m
+[31m-      currency: currency || 'INR',[m
+[32m+[m[32m      amount: finalAmountPaise,[m
+[32m+[m[32m      currency: finalCurrency,[m
+       receipt: `${app_name}_${session_id || Date.now()}`.slice(0, 40),[m
+       notes: {[m
+         user_id,[m
+[36m@@ -95,34 +165,29 @@[m [mexport default async function handler(req, res) {[m
+     });[m
+ [m
+     // Save transaction to Supabase if configured[m
+[31m-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;[m
+[31m-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;[m
+[31m-[m
+[31m-    if (supabaseUrl && serviceRoleKey) {[m
+[31m-      const supabase = createClient(supabaseUrl, serviceRoleKey);[m
+[31m-      const { error } = await supabase[m
+[31m-        .from('payment_transactions')[m
+[31m-        .insert({[m
+[31m-          user_id: user_id || null,[m
+[31m-          user_email: user_email || null,[m
+[31m-          user_phone: user_phone || null,[m
+[31m-          customer_name: customer_name || null,[m
+[31m-          app_name,[m
+[31m-          session_id,[m
+[31m-          razorpay_order_id: order.id,[m
+[31m-          amount: (amount_paise || 11682) / 100,[m
+[31m-          currency: currency || 'INR',[m
+[31m-          validity_days: validity_days || 30,[m
+[31m-          return_url: return_url || null,[m
+[31m-          course: course || null,[m
+[31m-          status: 'pending',[m
+[31m-        });[m
+[32m+[m[32m    if (supabase) {[m
+[32m+[m[32m      const { error } = await supabase.from('payment_transactions').insert({[m
+[32m+[m[32m        user_id: user_id || null,[m
+[32m+[m[32m        user_email: user_email || null,[m
+[32m+[m[32m        user_phone: user_phone || null,[m
+[32m+[m[32m        customer_name: customer_name || null,[m
+[32m+[m[32m        app_name,[m
+[32m+[m[32m        session_id,[m
+[32m+[m[32m        razorpay_order_id: order.id,[m
+[32m+[m[32m        amount: finalAmountPaise / 100,[m
+[32m+[m[32m        currency: finalCurrency,[m
+[32m+[m[32m        validity_days: validity_days || 30,[m
+[32m+[m[32m        return_url: return_url || null,[m
+[32m+[m[32m        course: course || null,[m
+[32m+[m[32m        status: 'pending',[m
+[32m+[m[32m      });[m
+ [m
+       if (error) {[m
+[31m-        // Non-fatal: payment_transactions table may not exist yet, or a column may[m
+[31m-        // differ from the schema.  The Razorpay order is already created so we[m
+[31m-        // continue and return a successful response to the client.[m
+[31m-        console.error('[create-order] Supabase insert into payment_transactions failed (non-fatal):', error.message);[m
+[32m+[m[32m        // Non-fatal[m
+[32m+[m[32m        console.error([m
+[32m+[m[32m          '[create-order] Supabase insert into payment_transactions failed (non-fatal):',[m
+[32m+[m[32m          error.message,[m
+[32m+[m[32m        );[m
+       }[m
+     }[m
+ [m
+[36m@@ -133,9 +198,10 @@[m [mexport default async function handler(req, res) {[m
+       keyId: process.env.RAZORPAY_KEY_ID,[m
+       session_id,[m
+       return_url: return_url || null,[m
+[32m+[m[32m      reused: false,[m
+     });[m
+   } catch (error) {[m
+     console.error('Order creation error:', error);[m
+     return res.status(500).json({ error: 'Unable to process payment. Please try again.' });[m
+   }[m
+[31m-}[m
+[32m+[m[32m}[m
+\ No newline at end of file[m
+[1mdiff --git a/pages/api/payments/verify-payment.js b/pages/api/payments/verify-payment.js[m
+[1mindex 2a42761..4a2ddcc 100644[m
+[1m--- a/pages/api/payments/verify-payment.js[m
+[1m+++ b/pages/api/payments/verify-payment.js[m
+[36m@@ -7,12 +7,18 @@[m [mimport { verifyHandoffToken } from '../../../lib/verifyHandoffToken';[m
+ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';[m
+ import { IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';[m
+ [m
+[32m+[m[32mconst CONFIRM_TIMEOUT_MS = 15000;[m
+[32m+[m[32mconst MAX_CONFIRM_BODY_CHARS = 4000; // prevent log spam / huge HTML responses[m
+[32m+[m
+[32m+[m[32mfunction safeTruncate(str, max = MAX_CONFIRM_BODY_CHARS) {[m
+[32m+[m[32m  if (!str) return '';[m
+[32m+[m[32m  if (str.length <= max) return str;[m
+[32m+[m[32m  return str.slice(0, max) + `…(truncated, ${str.length - max} chars more)`;[m
+[32m+[m[32m}[m
+[32m+[m
+ /**[m
+  * Compute the x-aienter-signature header value for the iiskills confirm request.[m
+  * Signature = HMAC-SHA256(rawBody, AIENTER_CONFIRMATION_SIGNING_SECRET) as hex.[m
+[31m- *[m
+[31m- * @param {string} rawBody  The exact JSON string being sent as the request body.[m
+[31m- * @returns {string}        Hex-encoded HMAC-SHA256 signature.[m
+  */[m
+ function computeConfirmSignature(rawBody) {[m
+   const secret = process.env.AIENTER_CONFIRMATION_SIGNING_SECRET;[m
+[36m@@ -30,11 +36,15 @@[m [mfunction computeConfirmSignature(rawBody) {[m
+  *   x-aienter-signature  – HMAC-SHA256 over the raw request body[m
+  *   x-aienter-timestamp  – Unix timestamp in seconds for replay-protection on iiskills side[m
+  *[m
+[31m- * @returns {{ ok: boolean, redirectUrl: string|null, error: string|null }}[m
+[32m+[m[32m * @returns {{[m
+[32m+[m[32m *   ok: boolean,[m
+[32m+[m[32m *   redirectUrl: string|null,[m
+[32m+[m[32m *   error: string|null,[m
+[32m+[m[32m *   debug?: any[m
+[32m+[m[32m * }}[m
+  */[m
+ async function callIiskillsConfirm(confirmPayload) {[m
+[31m-  const confirmUrl =[m
+[31m-    process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';[m
+[32m+[m[32m  const confirmUrl = process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';[m
+ [m
+   const rawBody = JSON.stringify(confirmPayload);[m
+   const timestamp = Math.floor(Date.now() / 1000).toString();[m
+[36m@@ -43,13 +53,16 @@[m [masync function callIiskillsConfirm(confirmPayload) {[m
+   try {[m
+     signature = computeConfirmSignature(rawBody);[m
+   } catch (err) {[m
+[31m-    return { ok: false, redirectUrl: null, error: err.message };[m
+[32m+[m[32m    return { ok: false, redirectUrl: null, error: err.message, debug: { stage: 'sign' } };[m
+   }[m
+ [m
+   const controller = new AbortController();[m
+[31m-  const timer = setTimeout(() => controller.abort(), 15000);[m
+[32m+[m[32m  const timer = setTimeout(() => controller.abort(), CONFIRM_TIMEOUT_MS);[m
+ [m
+   let confirmRes;[m
+[32m+[m[32m  let responseText = '';[m
+[32m+[m[32m  let responseJson = null;[m
+[32m+[m
+   try {[m
+     confirmRes = await fetch(confirmUrl, {[m
+       method: 'POST',[m
+[36m@@ -61,35 +74,65 @@[m [masync function callIiskillsConfirm(confirmPayload) {[m
+       body: rawBody,[m
+       signal: controller.signal,[m
+     });[m
+[32m+[m
+[32m+[m[32m    // Read body as text first so we can log it even if JSON parse fails.[m
+[32m+[m[32m    responseText = await confirmRes.text();[m
+[32m+[m
+[32m+[m[32m    try {[m
+[32m+[m[32m      responseJson = responseText ? JSON.parse(responseText) : null;[m
+[32m+[m[32m    } catch {[m
+[32m+[m[32m      responseJson = null;[m
+[32m+[m[32m    }[m
+   } catch (fetchErr) {[m
+     const msg =[m
+       fetchErr.name === 'AbortError'[m
+         ? 'iiskills confirm request timed out'[m
+         : `iiskills confirm network error: ${fetchErr.message}`;[m
+[31m-    return { ok: false, redirectUrl: null, error: msg };[m
+[32m+[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      ok: false,[m
+[32m+[m[32m      redirectUrl: null,[m
+[32m+[m[32m      error: msg,[m
+[32m+[m[32m      debug: { stage: 'fetch', confirmUrl, timeoutMs: CONFIRM_TIMEOUT_MS },[m
+[32m+[m[32m    };[m
+   } finally {[m
+     clearTimeout(timer);[m
+   }[m
+ [m
+[31m-  let confirmData = {};[m
+[31m-  try {[m
+[31m-    confirmData = await confirmRes.json();[m
+[31m-  } catch {[m
+[31m-    // ignore parse errors[m
+[31m-  }[m
+[32m+[m[32m  const debug = {[m
+[32m+[m[32m    stage: 'response',[m
+[32m+[m[32m    confirmUrl,[m
+[32m+[m[32m    status: confirmRes.status,[m
+[32m+[m[32m    ok: confirmRes.ok,[m
+[32m+[m[32m    timestamp,[m
+[32m+[m[32m    // include a small subset of headers that help debug reverse proxy / auth issues[m
+[32m+[m[32m    headers: {[m
+[32m+[m[32m      'content-type': confirmRes.headers.get('content-type'),[m
+[32m+[m[32m      'x-request-id': confirmRes.headers.get('x-request-id'),[m
+[32m+[m[32m      'cf-ray': confirmRes.headers.get('cf-ray'),[m
+[32m+[m[32m    },[m
+[32m+[m[32m    body_text: safeTruncate(responseText || ''),[m
+[32m+[m[32m    body_json: responseJson,[m
+[32m+[m[32m  };[m
+ [m
+   if (!confirmRes.ok) {[m
+     return {[m
+       ok: false,[m
+       redirectUrl: null,[m
+       error: `iiskills confirm returned HTTP ${confirmRes.status}`,[m
+[32m+[m[32m      debug,[m
+     };[m
+   }[m
+ [m
+[32m+[m[32m  // On success, prefer JSON redirect_url; otherwise attempt to read from parsed JSON.[m
+[32m+[m[32m  const redirectUrl =[m
+[32m+[m[32m    (responseJson && (responseJson.redirect_url || responseJson.redirectUrl)) || null;[m
+[32m+[m
+   re

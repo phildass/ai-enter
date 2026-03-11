@@ -13,7 +13,7 @@ export default async function handler(req, res) {
       razorpay_signature,
       courseId,
       customerName,
-      customerPhone
+      customerPhone,
     } = req.body;
 
     // Validate inputs
@@ -35,49 +35,44 @@ export default async function handler(req, res) {
     const isValid = expectedSignature === razorpay_signature;
 
     if (!isValid) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid payment signature' 
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid payment signature',
       });
     }
 
     // Payment is verified, now save to Supabase
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('purchases')
-          .insert([
-            {
-              customer_name: customerName,
-              customer_phone: customerPhone,
-              course_id: courseId,
-              razorpay_order_id: razorpay_order_id,
-              razorpay_payment_id: razorpay_payment_id,
-              payment_status: 'completed'
-            }
-          ]);
+        const { error } = await supabase.from('purchases').insert([
+          {
+            customer_name: customerName,
+            customer_phone: customerPhone,
+            course_id: courseId,
+            razorpay_order_id: razorpay_order_id,
+            razorpay_payment_id: razorpay_payment_id,
+            payment_status: 'completed',
+          },
+        ]);
 
         if (error) {
           console.error('Supabase error:', error);
-          // Still return success as payment was verified
-          // But log the database error
         }
       } catch (dbError) {
         console.error('Database error:', dbError);
-        // Payment is still valid, so we return success
       }
     }
 
-    res.status(200).json({ 
-      success: true, 
-      message: 'Payment verified successfully' 
+    res.status(200).json({
+      success: true,
+      message: 'Payment verified successfully',
     });
   } catch (error) {
     console.error('Error verifying payment:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Failed to verify payment', 
-      details: error.message 
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify payment',
+      details: error.message,
     });
   }
 }
