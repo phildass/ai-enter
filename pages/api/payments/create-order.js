@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     // For iiskills, session_id == purchaseId
     session_id = payload.purchaseId;
   } else if (req.body.session_token) {
-    // Token-based flow (jai-bharat, jai-kisan)
+    // Token-based flow (jai-bharat, jai-kisan, iisacademy)
     let payload;
     try {
       payload = verifyHandoffToken(req.body.session_token);
@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     app_name = payload.app_name;
     user_email = payload.user_email || '';
     user_phone = payload.user_phone;
+    customer_name = payload.customer_name || '';
     session_id = payload.session_id;
     amount_paise = payload.amount_paise;
     currency = payload.currency;
