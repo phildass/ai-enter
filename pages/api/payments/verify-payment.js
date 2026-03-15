@@ -189,12 +189,20 @@ export default async function handler(req, res) {
     app_name = payload.app_name;
 
     webhookUrl =
-      app_name === 'jai-kisan' ? process.env.JAI_KISAN_WEBHOOK_URL : process.env.JAI_BHARAT_WEBHOOK_URL;
+      app_name === 'jai-kisan'
+        ? process.env.JAI_KISAN_WEBHOOK_URL
+        : app_name === 'iisacademy'
+          ? process.env.IISACADEMY_WEBHOOK_URL
+          : process.env.JAI_BHARAT_WEBHOOK_URL;
   } else {
     user_id = bodyUserId;
     app_name = bodyAppName;
     webhookUrl =
-      app_name === 'jai-kisan' ? process.env.JAI_KISAN_WEBHOOK_URL : process.env.JAI_BHARAT_WEBHOOK_URL;
+      app_name === 'jai-kisan'
+        ? process.env.JAI_KISAN_WEBHOOK_URL
+        : app_name === 'iisacademy'
+          ? process.env.IISACADEMY_WEBHOOK_URL
+          : process.env.JAI_BHARAT_WEBHOOK_URL;
   }
 
   try {
@@ -345,7 +353,9 @@ export default async function handler(req, res) {
             ? process.env.JAI_KISAN_WEBHOOK_URL
             : appName === 'jai-bharat'
               ? process.env.JAI_BHARAT_WEBHOOK_URL
-              : webhookUrl;
+              : appName === 'iisacademy'
+                ? process.env.IISACADEMY_WEBHOOK_URL
+                : webhookUrl;
 
         if (resolvedWebhookUrl) {
           try {

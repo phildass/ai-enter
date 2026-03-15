@@ -50,6 +50,8 @@ export default function SegmentPaymentPage({
   rawToken,
   tokenError,
   allowedCourses,
+  displayPrice,
+  priceBreakdown,
 }) {
   const router = useRouter();
 
@@ -424,7 +426,7 @@ export default function SegmentPaymentPage({
   return (
     <>
       <Head>
-        <title>{brandName} Payment - ₹116.82</title>
+        <title>{brandName} Payment - {displayPrice || '₹116.82'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
@@ -604,11 +606,11 @@ export default function SegmentPaymentPage({
             </p>
 
             <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '3rem', fontWeight: 700 }}>₹116.82</span>
+              <span style={{ fontSize: '3rem', fontWeight: 700 }}>{displayPrice || '₹116.82'}</span>
             </div>
 
             <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>
-              (₹99 + 18% GST)
+              {priceBreakdown || '(₹99 + 18% GST)'}
             </p>
 
             <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '1rem' }}>
@@ -642,7 +644,7 @@ export default function SegmentPaymentPage({
               marginBottom: '0.75rem',
             }}
           >
-            {processing ? statusText || 'Processing…' : 'Pay ₹116.82'}
+            {processing ? statusText || 'Processing…' : `Pay ${displayPrice || '₹116.82'}`}
           </button>
 
           {confirmRetryPayload && (

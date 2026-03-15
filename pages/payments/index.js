@@ -21,6 +21,30 @@ export async function getServerSideProps({ query }) {
 
 const segments = [
   {
+    key: 'iisacademy',
+    name: 'IIS Academy',
+    domain: 'iisacademy.in',
+    emoji: '🎓',
+    color: '#9333ea',
+    bg: '#fae8ff',
+    description: 'Class 8–12 board + competitive prep — JEE, NEET, CA, and more.',
+    price: '₹1,178.82',
+    priceNote: '₹999 + 18% GST',
+    validity: '1 Year',
+  },
+  {
+    key: 'iisacademy2',
+    name: 'IIS Academy — All Classes',
+    domain: 'iisacademy.in',
+    emoji: '🚀',
+    color: '#ea580c',
+    bg: '#ffedd5',
+    description: 'Full access to all classes (8–12), competitive plugins, voice AI.',
+    price: '₹3,538.82',
+    priceNote: '₹2,999 + 18% GST',
+    validity: '1 Year',
+  },
+  {
     key: 'iiskills',
     name: 'iiskills',
     domain: 'iiskills.cloud',
@@ -29,6 +53,7 @@ const segments = [
     bg: '#ede9fe',
     description: 'Many learning apps — professional & skill-based courses.',
     price: '₹116.82',
+    priceNote: '₹99 + 18% GST',
     validity: '1 Year',
   },
   {
@@ -40,6 +65,7 @@ const segments = [
     bg: '#e0e7ff',
     description: 'Government jobs portal — SSC, Banking, Railways & more.',
     price: '₹116.82',
+    priceNote: '₹99 + 18% GST',
     validity: '1 Month',
   },
   {
@@ -51,6 +77,7 @@ const segments = [
     bg: '#dcfce7',
     description: 'Agricultural support — weather, market prices & expert advice.',
     price: '₹116.82',
+    priceNote: '₹99 + 18% GST',
     validity: '1 Month',
   },
 ];
@@ -59,9 +86,9 @@ export default function PaymentsIndex() {
   return (
     <>
       <Head>
-        <title>Payment Gateway — IIS Skills, Jai Bharat, Jai Kisan</title>
+        <title>Payment Gateway — IIS Academy, IIS Skills, Jai Bharat, Jai Kisan</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Central payment gateway for iiskills.cloud, jaibharat.cloud, and jaikisan.cloud." />
+        <meta name="description" content="Central payment gateway for iisacademy.in, iiskills.cloud, jaibharat.cloud, and jaikisan.cloud." />
       </Head>
 
       <style jsx global>{`
@@ -77,7 +104,8 @@ export default function PaymentsIndex() {
             Central Payment Gateway
           </h1>
           <p style={{ color: '#4b5563', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '1rem' }}>
-            This is a payment gateway for <strong>iiskills.cloud</strong>,{' '}
+            This is a payment gateway for <strong>iisacademy.in</strong>,{' '}
+            <strong>iiskills.cloud</strong>,{' '}
             <strong>jaibharat.cloud</strong> and <strong>jaikisan.cloud</strong>.
           </p>
           <div style={{
@@ -90,7 +118,8 @@ export default function PaymentsIndex() {
             lineHeight: 1.6,
           }}>
             ⚠️ <strong>Payments can only be initiated from the respective platforms.</strong>{' '}
-            Please visit <strong>iiskills.cloud</strong>, <strong>jaibharat.cloud</strong>, or{' '}
+            Please visit <strong>iisacademy.in</strong>, <strong>iiskills.cloud</strong>,{' '}
+            <strong>jaibharat.cloud</strong>, or{' '}
             <strong>jaikisan.cloud</strong> to make a payment. Payment buttons are not available on this page.
           </div>
         </div>
@@ -127,7 +156,7 @@ export default function PaymentsIndex() {
                 {seg.description}
               </p>
               <div style={{ fontSize: '0.85rem', color: '#374151' }}>
-                <p><strong>Price:</strong> {seg.price} <span style={{ color: '#9ca3af' }}>(₹99 + 18% GST)</span></p>
+                <p><strong>Price:</strong> {seg.price} <span style={{ color: '#9ca3af' }}>({seg.priceNote})</span></p>
                 <p><strong>Validity:</strong> {seg.validity}</p>
               </div>
               <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#9ca3af' }}>
