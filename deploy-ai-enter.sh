@@ -33,27 +33,19 @@ require_cmd sed
 
 log "Deploying $APP_NAME: branch=$BRANCH pm2=$APP_NAME port=$PORT"
 
-# --- Self-relocation (fixed to avoid infinite loop) ---
-SCRIPT_PATH="$(python3 - <<'PY' 2>/dev/null || true
-import os,sys
-print(os.path.realpath(sys.argv[1]))
-PY
-"$0")"
-
-if [ -z "${SCRIPT_PATH:-}" ]; then
-  SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || echo "$0")"
-fi
-
-SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-
-# Only relocate if in $APP_DIR or $NEW_DIR and NOT already in /tmp
-if ([[ "$SCRIPT_PATH" == "$APP_DIR"* ]] || [[ "$SCRIPT_PATH" == "$NEW_DIR"* ]]) && [[ "$SCRIPT_PATH" != /tmp/* ]]; then
-  TS_REEXEC="$(date +%s)"
-  TMP_SCRIPT="/tmp/deploy-${APP_NAME}-${TS_REEXEC}.sh"
-  log "Script is inside $APP_DIR or $NEW_DIR; copying to $TMP_SCRIPT and re-executing from /tmp"
-  cp -f "$SCRIPT_PATH" "$TMP_SCRIPT"
-  chmod +x "$TMP_SCRIPT"
-  exec "$TMP_SCRIPT"
+# --- Self-relocation: if executed from inside $APP_DIR or $NEW_DIR, copy to /tmp and re-exec ---
+# The _DEPLOY_RELOCATED guard prevents infinite re-execution if path resolution is unreliable.
+if [ -z "${_DEPLOY_RELOCATED:-}" ]; then
+  _script_dir="$(cd "$(dirname "$0")" 2>/dev/null && pwd || true)"
+  SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "${_script_dir}/$(basename "$0")")"
+  if [[ "$SCRIPT_PATH" == "$APP_DIR"* ]] || [[ "$SCRIPT_PATH" == "$NEW_DIR"* ]]; then
+    TS_REEXEC="$(date +%s)"
+    TMP_SCRIPT="/tmp/deploy-${APP_NAME}-${TS_REEXEC}.sh"
+    log "Script is inside $APP_DIR or $NEW_DIR; copying to $TMP_SCRIPT and re-executing from /tmp"
+    cp -f "$SCRIPT_PATH" "$TMP_SCRIPT"
+    chmod +x "$TMP_SCRIPT"
+    exec env _DEPLOY_RELOCATED=1 "$TMP_SCRIPT" "$@"
+  fi
 fi
 
 mkdir -p "$BACKUP_DIR"
@@ -134,15 +126,20 @@ pm2 delete "$APP_NAME" 2>/dev/null || true
 pm2 start ecosystem.config.js
 pm2 save
 
-# Health check
-log "Health check: http://127.0.0.1:$PORT/"
-set +e
-curl -fsS "http://127.0.0.1:$PORT/" >/dev/null
-HC=$?
-set -e
+# Health check — retry up to 10 times (60 s) to allow the app time to start
+log "Health check: http://127.0.0.1:$PORT/ (up to 10 attempts)"
+HC_OK=0
+for attempt in $(seq 1 10); do
+  if curl -fsS "http://127.0.0.1:$PORT/" >/dev/null 2>&1; then
+    HC_OK=1
+    break
+  fi
+  log "  attempt $attempt/10 failed — waiting 6 s…"
+  sleep 6
+done
 
-if [ "$HC" -ne 0 ]; then
-  log "Health check FAILED. Showing logs:"
+if [ "$HC_OK" -ne 1 ]; then
+  log "Health check FAILED after all attempts. Showing logs:"
   pm2 logs "$APP_NAME" --lines 120 || true
   fail "Deploy failed health check"
 fi
