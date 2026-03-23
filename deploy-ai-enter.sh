@@ -20,7 +20,7 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Missing required command: $1"
 }
 
-# --- Requirements (be explicit so failures are obvious) ---
+# --- Requirements ---
 require_cmd git
 require_cmd pm2
 require_cmd tar
@@ -33,24 +33,19 @@ require_cmd sed
 
 log "Deploying $APP_NAME: branch=$BRANCH pm2=$APP_NAME port=$PORT"
 
-# --- Self-relocation: allow running from anywhere (including inside APP_DIR) ---
-# If we are executing from inside APP_DIR or NEW_DIR, re-run from /tmp so the script
-# itself is not affected by directory swaps.
+# --- Self-relocation fix: prevent recursion when in /tmp/ ---
 SCRIPT_PATH="$(python3 - <<'PY' 2>/dev/null || true
 import os,sys
 print(os.path.realpath(sys.argv[1]))
 PY
 "$0")"
-
-# Fallback if python3 isn't available
 if [ -z "${SCRIPT_PATH:-}" ]; then
   SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || echo "$0")"
 fi
-
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 
-# If script is located under APP_DIR or NEW_DIR, copy to /tmp and exec it from there
-if [[ "$SCRIPT_PATH" == "$APP_DIR"* ]] || [[ "$SCRIPT_PATH" == "$NEW_DIR"* ]]; then
+# If inside $APP_DIR or $NEW_DIR but NOT already in /tmp, relocate to /tmp
+if ([[ "$SCRIPT_PATH" == "$APP_DIR"* ]] || [[ "$SCRIPT_PATH" == "$NEW_DIR"* ]]) && [[ "$SCRIPT_PATH" != /tmp/* ]]; then
   TS_REEXEC="$(date +%s)"
   TMP_SCRIPT="/tmp/deploy-${APP_NAME}-${TS_REEXEC}.sh"
   log "Script is inside $APP_DIR or $NEW_DIR; copying to $TMP_SCRIPT and re-executing from /tmp"
@@ -89,6 +84,12 @@ log "Checked out commit: $(git rev-parse --short HEAD)"
 
 log "Enabling corepack (ok if it fails)"
 corepack enable >/dev/null 2>&1 || true
+
+# Copy /etc/aienter.env as .env if present
+if [ -f /etc/aienter.env ]; then
+  cp /etc/aienter.env "$NEW_DIR/.env"
+  log "Copied /etc/aienter.env -> $NEW_DIR/.env"
+fi
 
 log "Installing dependencies"
 yarn install --immutable || yarn install
