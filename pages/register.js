@@ -67,7 +67,7 @@ export default function Register() {
   };
 
   return (
-    <Layout title="Register - iiskills.cloud">
+    <Layout title="Register - iiskills.in">
       <style jsx>{`
         .register-container {
           max-width: 800px;
@@ -225,7 +225,7 @@ export default function Register() {
 
       <div className="register-container">
         <div className="register-header">
-          <h1>Register for iiskills.cloud</h1>
+          <h1>Register for iiskills.in</h1>
         </div>
 
         <div className="register-note">

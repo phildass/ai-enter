@@ -29,9 +29,9 @@ function computeConfirmSignature(rawBody) {
 }
 
 /**
- * POST the payment confirmation to iiskills-cloud.
+ * POST the payment confirmation to iiskills-in.
  *
- * Endpoint: IISKILLS_CONFIRM_URL (default https://iiskills.cloud/api/payments/confirm)
+ * Endpoint: IISKILLS_CONFIRM_URL (default https://iiskills.in/api/payments/confirm)
  * Headers:
  *   x-aienter-signature  – HMAC-SHA256 over the raw request body
  *   x-aienter-timestamp  – Unix timestamp in seconds for replay-protection on iiskills side
@@ -44,7 +44,7 @@ function computeConfirmSignature(rawBody) {
  * }}
  */
 async function callIiskillsConfirm(confirmPayload) {
-  const confirmUrl = process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.cloud/api/payments/confirm';
+  const confirmUrl = process.env.IISKILLS_CONFIRM_URL || 'https://iiskills.in/api/payments/confirm';
 
   const rawBody = JSON.stringify(confirmPayload);
   const timestamp = Math.floor(Date.now() / 1000).toString();

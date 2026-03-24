@@ -47,7 +47,7 @@ const segments = [
   {
     key: 'iiskills',
     name: 'iiskills',
-    domain: 'iiskills.cloud',
+    domain: 'iiskills.in',
     emoji: '🎓',
     color: '#7c3aed',
     bg: '#ede9fe',
@@ -88,7 +88,7 @@ export default function PaymentsIndex() {
       <Head>
         <title>Payment Gateway — IIS Academy, IIS Skills, Jai Bharat, Jai Kisan</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <meta name="description" content="Central payment gateway for iisacademy.in, iiskills.cloud, jaibharat.cloud, and jaikisan.cloud." />
+        <meta name="description" content="Central payment gateway for iisacademy.in, iiskills.in, jaibharat.cloud, and jaikisan.cloud." />
       </Head>
 
       <style jsx global>{`
@@ -105,7 +105,7 @@ export default function PaymentsIndex() {
           </h1>
           <p style={{ color: '#4b5563', fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '1rem' }}>
             This is a payment gateway for <strong>iisacademy.in</strong>,{' '}
-            <strong>iiskills.cloud</strong>,{' '}
+            <strong>iiskills.in</strong>,{' '}
             <strong>jaibharat.cloud</strong> and <strong>jaikisan.cloud</strong>.
           </p>
           <div style={{
@@ -118,7 +118,7 @@ export default function PaymentsIndex() {
             lineHeight: 1.6,
           }}>
             ⚠️ <strong>Payments can only be initiated from the respective platforms.</strong>{' '}
-            Please visit <strong>iisacademy.in</strong>, <strong>iiskills.cloud</strong>,{' '}
+            Please visit <strong>iisacademy.in</strong>, <strong>iiskills.in</strong>,{' '}
             <strong>jaibharat.cloud</strong>, or{' '}
             <strong>jaikisan.cloud</strong> to make a payment. Payment buttons are not available on this page.
           </div>
@@ -174,8 +174,8 @@ export default function PaymentsIndex() {
               Contact support
             </Link>{' '}
             or email{' '}
-            <a href="mailto:support@iiskills.cloud" style={{ color: '#4f46e5' }}>
-              support@iiskills.cloud
+            <a href="mailto:support@iiskills.in" style={{ color: '#4f46e5' }}>
+              support@iiskills.in
             </a>
           </p>
           <p style={{ color: '#9ca3af', fontSize: '0.75rem', marginTop: '0.5rem' }}>

@@ -101,7 +101,7 @@ export default function Terms() {
           <ul>
             <li>Pricing is displayed at the time of purchase on the relevant product platform</li>
             <li>All payments are processed securely through Razorpay</li>
-            <li>Payment can only be initiated from the respective product platform (iiskills.cloud, jaibharat.cloud, or jaikisan.cloud)</li>
+            <li>Payment can only be initiated from the respective product platform (iiskills.in, jaibharat.cloud, or jaikisan.cloud)</li>
           </ul>
 
           <h2>3. Service Access and Content</h2>

@@ -7,7 +7,7 @@ const products = [
     name: 'IISkills',
     tagline: 'Professional skills and learning apps',
     description: 'A suite of learning applications for professional development, skill-building, and career advancement.',
-    domain: 'iiskills.cloud',
+    domain: 'iiskills.in',
     paymentPath: '/payments/iiskills',
     color: '#7c3aed',
     bg: '#ede9fe',
