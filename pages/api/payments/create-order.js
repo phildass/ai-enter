@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     course;
 
   if (req.body.iiskills_token) {
-    // New iiskills JWT flow: token issued by iiskills-cloud, verified with IISKILLS_PAYMENT_TOKEN_SECRET
+    // New iiskills JWT flow: token issued by iiskills, verified with IISKILLS_PAYMENT_TOKEN_SECRET
     let payload;
     try {
       // IMPORTANT: token may omit purchaseId; accept it from request body (from query string)

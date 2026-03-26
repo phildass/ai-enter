@@ -156,7 +156,7 @@ function buildJwt(payload, secret) {
     phone: '9876543210',
     name: 'Test User',
     course_slug: 'learn-ai',
-    return_to: 'https://iiskills.cloud/payment-success',
+    return_to: 'https://iiskills.in/payment-success',
     exp: nowSec + 3600,
   };
 
