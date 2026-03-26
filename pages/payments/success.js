@@ -109,7 +109,7 @@ export default function PaymentSuccess() {
           </div>
 
           <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-            If you have any issues, contact: support@iiskills.cloud
+            If you have any issues, contact: support@iiskills.in
           </p>
         </div>
       </div>

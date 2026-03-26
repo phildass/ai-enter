@@ -28,7 +28,7 @@ export async function getServerSideProps({ query }) {
   } catch (err) {
     console.error('[iiskills] Token verification failed:', err.message);
     return {
-      props: { tokenError: 'Invalid payment link. Please open from iiskills.cloud.' },
+      props: { tokenError: 'Invalid payment link. Please open from iiskills.in.' },
     };
   }
 }
@@ -53,7 +53,7 @@ export default function IisSkillsPay({ tokenPayload, rawToken, tokenError }) {
         'Progress tracking',
         'No recurring fees',
       ]}
-      originDomain="iiskills.cloud"
+      originDomain="iiskills.in"
       description="1-Year Access - iiskills Learning"
       allowedCourses={IISKILLS_COURSES}
       tokenPayload={tokenPayload || null}

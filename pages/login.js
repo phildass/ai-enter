@@ -73,7 +73,7 @@ export default function Login() {
   };
 
   return (
-    <Layout title="Login - iiskills.cloud">
+    <Layout title="Login - iiskills.in">
       <style jsx>{`
         .login-container {
           max-width: 500px;
@@ -264,7 +264,7 @@ export default function Login() {
 
       <div className="login-container">
         <div className="login-header">
-          <h1>Login to iiskills.cloud</h1>
+          <h1>Login to iiskills.in</h1>
         </div>
 
         <div className="google-recommendation">
