@@ -17,7 +17,7 @@ This guide covers deploying the AI Cloud Enterprises Next.js application to a pr
 - [ ] Nginx is installed and configured
 - [ ] Environment variables are set up
 - [ ] Domain DNS points to server IP
-- [ ] SSL certificate is configured (recommended)
+- [ ] SSL certificate is configured (required for production)
 
 ## Environment Variables
 
@@ -114,65 +114,64 @@ pm2 startup
 
 ### 5. Configure Nginx
 
-Create or update the Nginx configuration file:
+Copy the bundled Nginx configuration from the repository:
 
 ```bash
-sudo nano /etc/nginx/sites-available/aienter.in
+sudo cp nginx/aienter.in.conf /etc/nginx/sites-available/aienter.in
 ```
 
-Add the following configuration:
+The configuration file (`nginx/aienter.in.conf`) contains:
+- An HTTP server block that permanently redirects all traffic to HTTPS
+- An HTTPS server block that proxies requests to the Next.js app on port 3040 and references the Let's Encrypt certificate paths
 
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-    server_name aienter.in www.aienter.in;
-
-    # Redirect HTTP to HTTPS (uncomment after SSL is configured)
-    # return 301 https://$server_name$request_uri;
-
-    location / {
-        proxy_pass http://127.0.0.1:3040;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        
-        # Timeouts
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-}
-```
-
-Enable the site and reload Nginx:
+Enable the site and test the configuration:
 
 ```bash
 # Enable the site
 sudo ln -s /etc/nginx/sites-available/aienter.in /etc/nginx/sites-enabled/
 
-# Test Nginx configuration
+# Test Nginx configuration (HTTP-only passes before cert is issued)
 sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
 ```
 
-### 6. SSL Configuration (Recommended)
+### 6. SSL Certificate (Required)
+
+#### Step 1 — Install Certbot
 
 ```bash
-# Install Certbot
-sudo apt install -y certbot python3-certbot-nginx
+sudo apt update && sudo apt install certbot python3-certbot-nginx -y
+```
 
-# Obtain SSL certificate
-sudo certbot --nginx -d aienter.in -d www.aienter.in
+#### Step 2 — Issue the Certificate
 
-# Certbot will automatically update your Nginx configuration
+```bash
+sudo certbot certonly --nginx -d aienter.in -d www.aienter.in
+```
+
+Follow the prompts:
+- Enter a valid email address for renewal notifications
+- Agree to the Let's Encrypt Terms of Service
+
+Using `certonly` mode ensures Certbot obtains and stores the certificate without modifying the Nginx configuration (the bundled `nginx/aienter.in.conf` already contains the correct certificate paths and the HTTP→HTTPS redirect).
+
+#### Step 3 — Verify Nginx Config
+
+Confirm that `/etc/nginx/sites-available/aienter.in` contains the correct certificate paths:
+
+```nginx
+ssl_certificate /etc/letsencrypt/live/aienter.in/fullchain.pem;
+ssl_certificate_key /etc/letsencrypt/live/aienter.in/privkey.pem;
+```
+
+These paths are already present in the bundled `nginx/aienter.in.conf`.
+
+#### Step 4 — Restart and Test
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ## Verification Steps
@@ -219,11 +218,15 @@ sudo tail -f /var/log/nginx/error.log
 ### 4. Test Domain Access
 
 ```bash
-# Test from server
+# Test HTTP redirect (should return 301 -> HTTPS)
 curl -I http://aienter.in
 
+# Test HTTPS access
+curl -I https://aienter.in
+curl -I https://www.aienter.in
+
 # Test from your local machine
-# Visit http://aienter.in in your browser
+# Visit https://aienter.in in your browser and confirm the padlock icon is present
 ```
 
 ## Common Issues and Solutions
@@ -345,7 +348,7 @@ top
 
 ## Security Best Practices
 
-- [ ] Use HTTPS with valid SSL certificate
+- [x] Use HTTPS with valid SSL certificate
 - [ ] Keep Node.js and npm packages updated
 - [ ] Use strong, unique environment variables
 - [ ] Enable firewall (UFW) and only allow necessary ports
