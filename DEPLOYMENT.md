@@ -32,6 +32,8 @@ NEXT_PUBLIC_API_BASE_URL=
 # Razorpay Configuration
 RAZORPAY_KEY_ID=your_razorpay_key_id_here
 RAZORPAY_KEY_SECRET=your_razorpay_key_secret_here
+# Webhook secret — copy from https://dashboard.razorpay.com/app/webhooks
+RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret_here
 
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url_here
@@ -114,15 +116,17 @@ pm2 startup
 
 ### 5. Configure Nginx
 
-Copy the bundled Nginx configuration from the repository:
+Copy the bundled bootstrap Nginx configuration from the repository:
 
 ```bash
 sudo cp nginx/aienter.in.conf /etc/nginx/sites-available/aienter.in
 ```
 
-The configuration file (`nginx/aienter.in.conf`) contains:
-- An HTTP server block that permanently redirects all traffic to HTTPS
-- An HTTPS server block that proxies requests to the Next.js app on port 3040 and references the Let's Encrypt certificate paths
+This HTTP-only configuration contains all the required proxy headers (including
+`proxy_set_header X-Forwarded-Proto $scheme;`) in the location block. Nginx can
+load it immediately — before the SSL certificate exists — because it only listens
+on port 80. Certbot will extend this file with the HTTPS server block and redirect
+in the next step.
 
 Enable the site and test the configuration:
 
@@ -130,14 +134,14 @@ Enable the site and test the configuration:
 # Enable the site
 sudo ln -s /etc/nginx/sites-available/aienter.in /etc/nginx/sites-enabled/
 
-# Test Nginx configuration (HTTP-only passes before cert is issued)
+# Test Nginx configuration
 sudo nginx -t
 
 # Reload Nginx
 sudo systemctl reload nginx
 ```
 
-### 6. SSL Certificate (Required)
+### 6. SSL Certificate (Required for Razorpay)
 
 #### Step 1 — Install Certbot
 
@@ -148,25 +152,43 @@ sudo apt update && sudo apt install certbot python3-certbot-nginx -y
 #### Step 2 — Issue the Certificate
 
 ```bash
-sudo certbot certonly --nginx -d aienter.in -d www.aienter.in
+sudo certbot --nginx -d aienter.in -d www.aienter.in
 ```
 
 Follow the prompts:
 - Enter a valid email address for renewal notifications
 - Agree to the Let's Encrypt Terms of Service
+- **When asked about redirects, select Option 2 (Redirect)** to force all HTTP
+  traffic to HTTPS — this is mandatory for Razorpay to process payments over a
+  secure connection
 
-Using `certonly` mode ensures Certbot obtains and stores the certificate without modifying the Nginx configuration (the bundled `nginx/aienter.in.conf` already contains the correct certificate paths and the HTTP→HTTPS redirect).
+Certbot will obtain the certificate, update `/etc/nginx/sites-available/aienter.in`
+with the SSL directives, and configure the HTTP→HTTPS redirect automatically.
 
 #### Step 3 — Verify Nginx Config
 
-Confirm that `/etc/nginx/sites-available/aienter.in` contains the correct certificate paths:
+After Certbot completes, confirm that `/etc/nginx/sites-available/aienter.in`
+contains the following entries:
 
 ```nginx
+# SSL certificates issued by Let's Encrypt
 ssl_certificate /etc/letsencrypt/live/aienter.in/fullchain.pem;
 ssl_certificate_key /etc/letsencrypt/live/aienter.in/privkey.pem;
 ```
 
-These paths are already present in the bundled `nginx/aienter.in.conf`.
+Also confirm that `proxy_set_header X-Forwarded-Proto $scheme;` is present inside
+the `location /` block of the HTTPS server. This header tells Next.js the request
+arrived over HTTPS, preventing Mixed Content errors during Razorpay checkout:
+
+```nginx
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+If Certbot moved the location block without this header, add it manually:
+
+```bash
+sudo nano /etc/nginx/sites-available/aienter.in
+```
 
 #### Step 4 — Restart and Test
 
@@ -227,6 +249,31 @@ curl -I https://www.aienter.in
 
 # Test from your local machine
 # Visit https://aienter.in in your browser and confirm the padlock icon is present
+```
+
+### 5. Test the Razorpay Payment Route
+
+Verify that the Razorpay webhook endpoint is reachable and returns an expected
+status (200 or 400 — **not** 404 or an "Insecure" warning):
+
+```bash
+# A GET request returns 405 Method Not Allowed — confirms the route exists
+curl -I https://aienter.in/api/webhooks/razorpay
+
+# A POST without a valid signature returns 400 Bad Request — confirms signature
+# validation is active
+curl -s -o /dev/null -w "%{http_code}" \
+  -X POST https://aienter.in/api/webhooks/razorpay \
+  -H "Content-Type: application/json" \
+  -d '{"event":"payment.captured"}'
+# Expected output: 400
+```
+
+If the endpoint returns 404, the application has not been built/started after the
+latest code changes. Rebuild and restart:
+
+```bash
+npm run build && pm2 restart ai-enter
 ```
 
 ## Common Issues and Solutions
