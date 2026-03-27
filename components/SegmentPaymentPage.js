@@ -650,7 +650,7 @@ export default function SegmentPaymentPage({
           {confirmRetryPayload && (
             <button
               onClick={retryConfirmation}
- /etc/</div>             disabled={processing}
+              disabled={processing}
               style={{
                 width: '100%',
                 padding: '0.9rem',
