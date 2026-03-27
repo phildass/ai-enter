@@ -144,24 +144,16 @@ export default function SegmentPaymentPage({
       }
 
 
-      const orderData = await orderResponse.json();
-
-      if (!orderResponse.ok) {
-        console.error('[payment] Order creation failed:', orderData.error);
-        // 409 means this purchase/session has already been paid — surface a clear message.
-        if (orderResponse.status === 409) {
-          setError(orderData.error || 'This payment link has already been used. Please start a new purchase.');
-          setLoading(false);
-          setLoadingStatus('');
-          return;
-        }
-        throw new Error(orderData.error || 'Payment could not be initiated. Please try again.');
-
       const createJson = await createRes.json();
       if (!createRes.ok) {
         console.error('[payment] Order creation failed:', createJson?.error);
+        if (createRes.status === 409) {
+          setError(createJson?.error || 'This payment link has already been used. Please start a new purchase.');
+          setProcessing(false);
+          setStatusText('');
+          return;
+        }
         throw new Error(createJson?.error || 'Payment could not be initiated. Please try again.');
-
       }
 
       console.log('[payment] Order created:', createJson.orderId);
