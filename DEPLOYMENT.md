@@ -116,17 +116,40 @@ pm2 startup
 
 ### 5. Configure Nginx
 
-Copy the bundled bootstrap Nginx configuration from the repository:
+#### Step 0 — Clear any broken site symlinks
+
+If `sudo nginx -t` fails due to a syntax error in a neighbouring site (e.g.
+`iiskills.in.conf`), remove the broken symlink before proceeding. A single
+broken config in `sites-enabled/` prevents Certbot from completing the ACME
+challenge for **any** site on the server.
+
+```bash
+# Identify which symlink is broken
+sudo nginx -t 2>&1
+
+# Example: remove the broken iiskills link (adjust filename as needed)
+sudo rm /etc/nginx/sites-enabled/iiskills.in.conf
+
+# Confirm Nginx is now happy
+sudo nginx -t
+```
+
+#### Step 1 — Deploy the aienter.in config
+
+Copy the bundled Nginx configuration from the repository:
 
 ```bash
 sudo cp nginx/aienter.in.conf /etc/nginx/sites-available/aienter.in
 ```
 
-This HTTP-only configuration contains all the required proxy headers (including
-`proxy_set_header X-Forwarded-Proto $scheme;`) in the location block. Nginx can
-load it immediately — before the SSL certificate exists — because it only listens
-on port 80. Certbot will extend this file with the HTTPS server block and redirect
-in the next step.
+This configuration includes:
+- An HTTP server block (port 80) that Certbot uses for the ACME challenge and
+  then converts to a permanent redirect.
+- A dedicated `location /_next/static/` block that serves Next.js static assets
+  directly from disk (`/var/www/ai-enter/.next/static/`), preventing UI layout
+  distortion caused by proxied asset requests.
+- All required proxy headers (`X-Forwarded-Proto`, etc.) needed by Next.js and
+  Razorpay.
 
 Enable the site and test the configuration:
 
@@ -165,10 +188,35 @@ Follow the prompts:
 Certbot will obtain the certificate, update `/etc/nginx/sites-available/aienter.in`
 with the SSL directives, and configure the HTTP→HTTPS redirect automatically.
 
-#### Step 3 — Verify Nginx Config
+#### Step 3 — Add HTTP/2 and verify the HTTPS config
 
-After Certbot completes, confirm that `/etc/nginx/sites-available/aienter.in`
-contains the following entries:
+After Certbot completes, open the config and make two additions inside the new
+HTTPS server block:
+
+**a) Enable HTTP/2** — add `http2 on;` on a new line alongside the existing
+`listen 443 ssl;` directives:
+
+```nginx
+listen 443 ssl;
+listen [::]:443 ssl;
+http2 on;
+```
+
+**b) Add the static-asset location block** — copy the `location /_next/static/`
+block from the HTTP server block (or from the reference section at the bottom of
+`nginx/aienter.in.conf`) into the HTTPS server block, above the `location /`
+block:
+
+```nginx
+location /_next/static/ {
+    alias /var/www/ai-enter/.next/static/;
+    access_log off;
+    add_header Cache-Control "public, max-age=31536000, immutable";
+}
+```
+
+**c) Confirm SSL certificates** — also confirm that the following entries are
+present:
 
 ```nginx
 # SSL certificates issued by Let's Encrypt
@@ -184,7 +232,7 @@ arrived over HTTPS, preventing Mixed Content errors during Razorpay checkout:
 proxy_set_header X-Forwarded-Proto $scheme;
 ```
 
-If Certbot moved the location block without this header, add it manually:
+If any of the above are missing, add them manually:
 
 ```bash
 sudo nano /etc/nginx/sites-available/aienter.in
@@ -277,6 +325,35 @@ npm run build && pm2 restart ai-enter
 ```
 
 ## Common Issues and Solutions
+
+### Issue: `nginx -t` fails due to a broken neighbouring site config
+
+**Symptom:** `sudo nginx -t` reports a syntax error in a file such as
+`/etc/nginx/sites-enabled/iiskills.in.conf`, preventing Certbot from completing
+the ACME challenge for aienter.in.
+
+**Solution:**
+```bash
+# Identify the broken symlink
+sudo nginx -t 2>&1
+
+# Remove the broken symlink (Nginx reads the original file in sites-available,
+# so this does not delete the source config — only the active link)
+sudo rm /etc/nginx/sites-enabled/iiskills.in.conf   # adjust filename as needed
+
+# Confirm Nginx passes its self-test
+sudo nginx -t
+
+# Reload to apply the change
+sudo systemctl reload nginx
+```
+
+Once aienter.in is fully configured and the certificate is issued, you can
+re-enable the other site (after fixing its config) by recreating the symlink:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/iiskills.in /etc/nginx/sites-enabled/
+```
 
 ### Issue: Port 3040 is not responding
 
