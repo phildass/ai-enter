@@ -99,6 +99,12 @@ export default function Contact() {
           font-weight: 500;
         }
 
+        .contact-info .address-name {
+          font-weight: 700;
+          font-size: 1.1rem;
+          margin-bottom: 0.5rem;
+        }
+
         .contact-form {
           background: white;
           padding: 4rem;
@@ -210,6 +216,14 @@ export default function Contact() {
       </div>
 
       <div className="container">
+        <div className="contact-info">
+          <h2>Our Address</h2>
+          <p className="address-name">AI CLOUD ENTERPRISES</p>
+          <p>648/A, 4th Floor, Proworks</p>
+          <p>100 Ft Road, Indiranagar</p>
+          <p>Bangalore – 560038</p>
+        </div>
+
         <div className="contact-info">
           <h2>Contact Email</h2>
           <p>support@aienter.in</p>
