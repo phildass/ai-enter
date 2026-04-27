@@ -211,8 +211,9 @@ export default function Contact() {
 
       <div className="container">
         <div className="contact-info">
-          <h2>Contact Email</h2>
-          <p>support@aienter.in</p>
+          <h2>Contact: AI CLOUD ENTERPRISES</h2>
+          <p>648/A, 4th Floor, Proworks, 100 Ft Road, Indiranagar, Bangalore - 560038</p>
+          <p style={{ marginTop: '1rem' }}>Email: support@aienter.in</p>
         </div>
 
         <div className="contact-form">
