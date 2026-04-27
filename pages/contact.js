@@ -99,6 +99,10 @@ export default function Contact() {
           font-weight: 500;
         }
 
+        .contact-info p + p {
+          margin-top: 1rem;
+        }
+
         .contact-form {
           background: white;
           padding: 4rem;
@@ -213,7 +217,7 @@ export default function Contact() {
         <div className="contact-info">
           <h2>Contact: AI CLOUD ENTERPRISES</h2>
           <p>648/A, 4th Floor, Proworks, 100 Ft Road, Indiranagar, Bangalore - 560038</p>
-          <p style={{ marginTop: '1rem' }}>Email: support@aienter.in</p>
+          <p>Email: support@aienter.in</p>
         </div>
 
         <div className="contact-form">
