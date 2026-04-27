@@ -211,6 +211,12 @@ export default function Contact() {
 
       <div className="container">
         <div className="contact-info">
+          <h2>Our Address</h2>
+          <p style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>AI CLOUD ENTERPRISES</p>
+          <p>648/A, 4th Floor, Proworks<br />100 Ft Road, Indiranagar<br />Bangalore – 560038</p>
+        </div>
+
+        <div className="contact-info">
           <h2>Contact Email</h2>
           <p>support@aienter.in</p>
         </div>
