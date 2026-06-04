@@ -1,49 +1,19 @@
-import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const appDetails = {
-  'iiskills': {
-    name: 'iiskills',
-    emoji: '🎓',
-    bgColor: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-    cardBg: '#ede9fe',
-    titleColor: '#4c1d95',
-    accentColor: '#7c3aed',
-    borderColor: '#c4b5fd',
-    validity: '1 year',
-  },
-  'jai-kisan': {
-    name: 'Jai Kisan',
-    emoji: '🌾',
-    bgColor: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-    cardBg: '#dcfce7',
-    titleColor: '#14532d',
-    accentColor: '#16a34a',
-    borderColor: '#86efac',
-    validity: '1 month',
-  },
-  'jai-bharat': {
-    name: 'Jai Bharat',
-    emoji: '🇮🇳',
-    bgColor: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-    cardBg: '#e0e7ff',
-    titleColor: '#1e1b4b',
-    accentColor: '#4f46e5',
-    borderColor: '#a5b4fc',
-    validity: '1 month',
-  },
+  name: 'iiskills',
+  bgColor: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+  cardBg: '#ede9fe',
+  titleColor: '#4c1d95',
+  accentColor: '#7c3aed',
+  validity: '1 year',
 };
 
 export default function PaymentSuccess() {
-  const router = useRouter();
-  const { app } = router.query;
-
-  const currentApp = appDetails[app] || appDetails['iiskills'];
-
   return (
     <>
       <Head>
-        <title>Payment Successful - {currentApp.name}</title>
+        <title>Payment Successful - {appDetails.name}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
@@ -54,7 +24,7 @@ export default function PaymentSuccess() {
 
       <div style={{
         minHeight: '100vh',
-        background: currentApp.bgColor,
+        background: appDetails.bgColor,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -71,40 +41,40 @@ export default function PaymentSuccess() {
         }}>
           <div style={{
             width: '72px', height: '72px',
-            background: currentApp.cardBg,
+            background: appDetails.cardBg,
             borderRadius: '50%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 1rem',
             fontSize: '2.5rem',
           }}>✅</div>
 
-          <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: currentApp.titleColor, marginBottom: '0.5rem' }}>
+          <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
             Payment Successful!
           </h1>
 
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-            Thank you for your payment to <strong>{currentApp.name}</strong>.
+            Thank you for your payment to <strong>{appDetails.name}</strong>.
           </p>
 
           <div style={{
-            background: currentApp.cardBg,
-            borderLeft: `4px solid ${currentApp.accentColor}`,
+            background: appDetails.cardBg,
+            borderLeft: `4px solid ${appDetails.accentColor}`,
             borderRadius: '8px',
             padding: '1rem',
             marginBottom: '1.5rem',
             textAlign: 'left',
           }}>
-            <p style={{ fontSize: '0.85rem', fontWeight: '700', color: currentApp.titleColor, marginBottom: '0.5rem' }}>
+            <p style={{ fontSize: '0.85rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
               ⏰ Next Step: Access Your Course
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              Your access is being activated automatically. Please return to the app to access your course.
+              Your iiskills access is being activated automatically. Please return to iiskills.in to access your course.
             </p>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
             <p>✅ Payment Amount: ₹116.82</p>
-            <p>✅ Access Valid for {currentApp.validity}</p>
+            <p>✅ Access Valid for {appDetails.validity}</p>
             <p>✅ No Recurring Fees</p>
           </div>
 
