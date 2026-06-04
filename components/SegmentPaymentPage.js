@@ -398,12 +398,45 @@ export default function SegmentPaymentPage({
 
   // Render guards
   if (tokenError) {
+    const isRichTokenError = tokenError && typeof tokenError === 'object';
+    const tokenErrorTitle = isRichTokenError ? tokenError.title : null;
+    const tokenErrorLines = isRichTokenError
+      ? tokenError.lines
+      : [tokenError || `Invalid payment link. Please open from ${originDomain}.`];
+    const tokenErrorPortalUrl = isRichTokenError ? tokenError.portalUrl : null;
+    const tokenErrorPortalLabel = isRichTokenError ? tokenError.portalLabel : null;
+
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: bgGradient }}>
-        <div style={{ background: 'white', borderRadius: 16, padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: 400 }}>
-          <p style={{ color: '#ef4444', marginBottom: '1rem', fontSize: '0.95rem' }}>
-            {tokenError || `Invalid payment link. Please open from ${originDomain}.`}
-          </p>
+        <div style={{ background: 'white', borderRadius: 16, padding: '2rem', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', maxWidth: 460 }}>
+          {tokenErrorTitle && (
+            <h2 style={{ color: '#4c1d95', margin: '0 0 1rem', fontSize: '1.35rem' }}>
+              {tokenErrorTitle}
+            </h2>
+          )}
+          {tokenErrorLines.map((line) => (
+            <p key={line} style={{ color: '#ef4444', marginBottom: '0.75rem', fontSize: '0.95rem', lineHeight: 1.45 }}>
+              {line}
+            </p>
+          ))}
+          {tokenErrorPortalUrl && (
+            <a
+              href={tokenErrorPortalUrl}
+              style={{
+                display: 'inline-block',
+                marginTop: '0.5rem',
+                padding: '0.65rem 1rem',
+                borderRadius: 8,
+                textDecoration: 'none',
+                background: accentGradient,
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '0.95rem',
+              }}
+            >
+              {tokenErrorPortalLabel || tokenErrorPortalUrl}
+            </a>
+          )}
         </div>
       </div>
     );

@@ -3,13 +3,24 @@ import { verifyIiskillsToken } from '../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
 
 const IISKILLS_COURSES = IISKILLS_ALLOWED_COURSES;
+const DIRECT_ACCESS_ERROR = {
+  title: '⚠️ Direct Access Not Allowed',
+  lines: [
+    'Payments are only accepted from official AI Cloud Enterprises portals.',
+    'For iiskills payments, please visit:',
+    'If you were redirected here by iiskills.in, please try again or contact support.',
+    'This security measure protects your payment information.',
+  ],
+  portalUrl: 'https://iiskills.in',
+  portalLabel: '🔗 https://iiskills.in',
+};
 
 export async function getServerSideProps({ query }) {
   const { purchaseId, token } = query;
 
   if (!purchaseId || !token) {
     return {
-      props: { tokenError: 'Invalid payment link. Missing required parameters.' },
+      props: { tokenError: DIRECT_ACCESS_ERROR },
     };
   }
 
@@ -28,7 +39,7 @@ export async function getServerSideProps({ query }) {
   } catch (err) {
     console.error('[iiskills] Token verification failed:', err.message);
     return {
-      props: { tokenError: 'Invalid payment link. Please open from iiskills.in.' },
+      props: { tokenError: DIRECT_ACCESS_ERROR },
     };
   }
 }
