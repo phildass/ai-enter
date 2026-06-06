@@ -107,6 +107,21 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
 
   // Show error if token verification failed
   if (tokenError) {
+    // Check if tokenError is a string or an object
+    if (typeof tokenError === 'string') {
+      return (
+        <div style={styles.container}>
+          <div style={styles.errorBox}>
+            <h2 style={styles.errorTitle}>⚠️ Error</h2>
+            <p style={styles.errorText}>{tokenError}</p>
+            <a href="https://iiskills.in" style={styles.portalLink}>
+              🔗 https://iiskills.in
+            </a>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={styles.container}>
         <div style={styles.errorBox}>
