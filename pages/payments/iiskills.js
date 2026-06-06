@@ -1,11 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { verifyIiskillsToken } from '../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
 
 const DIRECT_ACCESS_ERROR = {
   title: '⚠️ Direct Access Not Allowed',
   lines: [
-    'Payments can only be made through official iiskills.in portals.',
+    'Payments are only accepted from official AI Cloud Enterprises portals.',
+    'For iiskills payments, please visit:',
     'If you were redirected here by iiskills.in, please try again or contact support.',
     'This security measure protects your payment information.',
   ],
@@ -45,11 +46,13 @@ export async function getServerSideProps({ query }) {
 }
 
 export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
-  const [selectedCourse, setSelectedCourse] = useState(tokenPayload?.courseSlug || 'learn-ai');
+  const [selectedCourse, setSelectedCourse] = useState(
+    tokenPayload?.courseSlug || 'learn-ai'
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Determine if we're in bundle phase (till June 15, 2026)
+  // Determine if we're in bundle phase (till June 15, 2026, 11:59:59 PM UTC)
   const CUTOFF_DATE = new Date('2026-06-16T00:00:00Z');
   const isBundlePhase = new Date() < CUTOFF_DATE;
 
@@ -74,7 +77,7 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
   ];
 
   const getCourseName = (courseId) => {
-    return courseOptions.find(c => c.id === courseId)?.name || courseId;
+    return courseOptions.find((c) => c.id === courseId)?.name || courseId;
   };
 
   const handlePayment = async () => {
@@ -82,16 +85,17 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
     setError('');
 
     try {
-      // TODO: Call Razorpay payment API
+      const courseId = isBundlePhase ? 'all-courses-bundle' : selectedCourse;
+
       console.log('Starting payment with:', {
-        courseId: isBundlePhase ? 'all-courses-bundle' : selectedCourse,
+        courseId,
         amount: TOTAL_PRICE,
         firstName,
         lastName,
         phone,
       });
-      
-      // This will be connected to the actual payment endpoint
+
+      // TODO: Call actual Razorpay payment API
       alert('Payment processing would start here');
     } catch (err) {
       setError('Payment failed. Please try again.');
@@ -106,13 +110,14 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
     return (
       <div style={styles.container}>
         <div style={styles.errorBox}>
-          <div style={styles.errorIcon}>{DIRECT_ACCESS_ERROR.title.split(' ')[0]}</div>
-          <h2 style={styles.errorTitle}>{DIRECT_ACCESS_ERROR.title}</h2>
-          {DIRECT_ACCESS_ERROR.lines.map((line, idx) => (
-            <p key={idx} style={styles.errorText}>{line}</p>
+          <h2 style={styles.errorTitle}>{tokenError.title}</h2>
+          {tokenError.lines.map((line, idx) => (
+            <p key={idx} style={styles.errorText}>
+              {line}
+            </p>
           ))}
-          <a href={DIRECT_ACCESS_ERROR.portalUrl} style={styles.portalLink}>
-            {DIRECT_ACCESS_ERROR.portalLabel}
+          <a href={tokenError.portalUrl} style={styles.portalLink}>
+            {tokenError.portalLabel}
           </a>
         </div>
       </div>
@@ -123,7 +128,7 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
     <div style={styles.container}>
       <div style={styles.formBox}>
         <h1 style={styles.title}>📋 Complete Your Order</h1>
-        
+
         {/* User Details - Display Only */}
         <div style={styles.section}>
           <div style={styles.fieldRow}>
@@ -135,20 +140,20 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
 
           <div style={styles.fieldRow}>
             <label style={styles.label}>Phone</label>
-            <div style={styles.displayValue}>
-              {phone}
-            </div>
+            <div style={styles.displayValue}>{phone}</div>
           </div>
         </div>
 
         {/* Course Selection */}
         <div style={styles.section}>
           <label style={styles.label}>Course</label>
-          
+
           {isBundlePhase ? (
             <div style={styles.displayValue}>
               All Courses (5 Paid Apps)
-              <div style={styles.bundleNote}>Limited Time Offer - Valid till June 15, 2026</div>
+              <div style={styles.bundleNote}>
+                Limited Time Offer - Valid till June 15, 2026
+              </div>
             </div>
           ) : (
             <select
@@ -156,7 +161,7 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
               onChange={(e) => setSelectedCourse(e.target.value)}
               style={styles.select}
             >
-              {courseOptions.map(course => (
+              {courseOptions.map((course) => (
                 <option key={course.id} value={course.id}>
                   {course.name}
                 </option>
@@ -214,7 +219,8 @@ const styles = {
     justifyContent: 'center',
     background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
     padding: '2rem',
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    fontFamily:
+      "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   },
   formBox: {
     maxWidth: '500px',
@@ -336,10 +342,6 @@ const styles = {
     padding: '2.5rem',
     boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1)',
     textAlign: 'center',
-  },
-  errorIcon: {
-    fontSize: '2.5rem',
-    marginBottom: '1rem',
   },
   errorTitle: {
     fontSize: '1.5rem',
