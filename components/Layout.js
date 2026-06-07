@@ -152,8 +152,6 @@ export default function Layout({ children, title = 'AI Cloud Enterprises - Build
             <li><Link href="/about">About</Link></li>
             <li><Link href="/contact">Contact</Link></li>
             <li><Link href="/payments">Payment</Link></li>
-            <li><Link href="/register">Register</Link></li>
-            <li><Link href="/login">Login</Link></li>
             <li><Link href="/privacy">Privacy Policy</Link></li>
             <li><Link href="/terms">Terms & Conditions</Link></li>
           </ul>
