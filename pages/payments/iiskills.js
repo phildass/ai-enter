@@ -45,7 +45,7 @@ export async function getServerSideProps({ query }) {
   }
 }
 
-export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
+export default function IisSkillsPaymentsPage({ tokenPayload, tokenError, rawToken }) {
   const [selectedCourse, setSelectedCourse] = useState(
     tokenPayload?.courseSlug || 'learn-ai'
   );
