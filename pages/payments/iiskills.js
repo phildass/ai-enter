@@ -87,20 +87,83 @@ export default function IisSkillsPaymentsPage({ tokenPayload, tokenError }) {
     try {
       const courseId = isBundlePhase ? 'all-courses-bundle' : selectedCourse;
 
-      console.log('Starting payment with:', {
-        courseId,
-        amount: TOTAL_PRICE,
-        firstName,
-        lastName,
-        phone,
+      // Step 1: Create Razorpay order on backend
+      const orderResponse = await fetch('/api/payments/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          iiskills_token: rawToken,
+          purchaseId: tokenPayload?.purchaseId,
+          course: courseId,
+        }),
       });
 
-      // TODO: Call actual Razorpay payment API
-      alert('Payment processing would start here');
+      if (!orderResponse.ok) {
+        const errData = await orderResponse.json();
+        throw new Error(errData.error || 'Failed to create order');
+      }
+
+      const { orderId, amount, keyId, session_id } = await orderResponse.json();
+
+      // Step 2: Initialize Razorpay checkout
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => {
+        const options = {
+          key: keyId,
+          amount: amount,
+          currency: 'INR',
+          name: 'AI Cloud Enterprises',
+          description: `Payment for ${getCourseName(courseId)}`,
+          order_id: orderId,
+          prefill: {
+            name: `${firstName} ${lastName}`,
+            contact: phone,
+          },
+          handler: async (response) => {
+            // Step 3: Verify payment on backend
+            try {
+              const verifyResponse = await fetch('/api/payments/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  iiskills_token: rawToken,
+                  purchaseId: tokenPayload?.purchaseId,
+                }),
+              });
+
+              if (!verifyResponse.ok) {
+                const errData = await verifyResponse.json();
+                throw new Error(errData.error || 'Payment verification failed');
+              }
+
+              const verifyData = await verifyResponse.json();
+              
+              // Success! Redirect to success page or handle as needed
+              window.location.href = verifyData.redirect_url || '/payments/success';
+            } catch (err) {
+              setError('Payment verification failed: ' + err.message);
+              setLoading(false);
+            }
+          },
+          modal: {
+            ondismiss: () => {
+              setError('Payment cancelled');
+              setLoading(false);
+            },
+          },
+        };
+
+        const razorpay = new window.Razorpay(options);
+        razorpay.open();
+      };
+      document.body.appendChild(script);
     } catch (err) {
-      setError('Payment failed. Please try again.');
-      console.error('Payment error:', err);
-    } finally {
+      setError('Payment failed: ' + (err.message || 'Please try again.'));
       setLoading(false);
     }
   };
