@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const appDetails = {
@@ -7,9 +9,25 @@ const appDetails = {
   titleColor: '#4c1d95',
   accentColor: '#7c3aed',
   validity: '1 year',
+  dashboardUrl: 'https://iiskills.in/dashboard',
 };
 
 export default function PaymentSuccess() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Auto-redirect to iiskills dashboard after 3 seconds
+    const timer = setTimeout(() => {
+      window.location.href = appDetails.dashboardUrl;
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleRedirectNow = () => {
+    window.location.href = appDetails.dashboardUrl;
+  };
+
   return (
     <>
       <Head>
@@ -68,7 +86,7 @@ export default function PaymentSuccess() {
               ⏰ Next Step: Access Your Course
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              Your iiskills access is being activated automatically. Please return to iiskills.in to access your course.
+              Your iiskills access is being activated automatically. Redirecting to your dashboard in 3 seconds...
             </p>
           </div>
 
@@ -77,6 +95,27 @@ export default function PaymentSuccess() {
             <p>✅ Access Valid for {appDetails.validity}</p>
             <p>✅ No Recurring Fees</p>
           </div>
+
+          <button
+            onClick={handleRedirectNow}
+            style={{
+              width: '100%',
+              padding: '0.75rem 1rem',
+              background: `linear-gradient(135deg, ${appDetails.accentColor} 0%, #a855f7 100%)`,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              marginBottom: '1rem',
+              transition: 'transform 0.2s',
+            }}
+            onMouseOver={(e) => e.target.style.transform = 'scale(1.02)'}
+            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+          >
+            Go to Dashboard Now
+          </button>
 
           <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
             If you have any issues, contact: support@iiskills.in
