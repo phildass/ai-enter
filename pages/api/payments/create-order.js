@@ -6,6 +6,7 @@ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
+import { createPaymentLinkForOrder } from '../../../lib/razorpayPaymentLink';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -127,6 +128,30 @@ export default async function handler(req, res) {
 
     const freshOrder = Boolean(req.body.fresh_order);
 
+    async function buildCheckoutPayload(orderRow, orderAmountPaise) {
+      const checkoutUrl = await createPaymentLinkForOrder(razorpay, {
+        orderId: orderRow.id,
+        referenceId: session_id,
+        amountPaise: orderAmountPaise,
+        currency: orderRow.currency || currency || 'INR',
+        description: `${app_name} course payment`,
+        customerName: customer_name,
+        customerPhone: user_phone,
+        customerEmail: user_email,
+        appName: app_name,
+      });
+
+      return {
+        orderId: orderRow.id,
+        amount: orderRow.amount || orderAmountPaise,
+        currency: orderRow.currency || currency || 'INR',
+        keyId: publicKey,
+        session_id,
+        return_url: return_url || null,
+        checkoutUrl,
+      };
+    }
+
     // --- Idempotency / reuse protection (requires Supabase configured) ---
     if (supabase && app_name && session_id) {
       // Find latest transaction for this app_name + session_id
@@ -175,15 +200,11 @@ export default async function handler(req, res) {
                   .update({ handoff_token, updated_at: new Date().toISOString() })
                   .eq('id', row.id);
               }
-              return res.status(200).json({
-                orderId: existingOrder.id,
-                amount: existingOrder.amount,
-                currency: existingOrder.currency || currency || 'INR',
-                keyId: publicKey,
-                session_id,
-                return_url: row.return_url || return_url || null,
-                reused: true,
-              });
+              const payload = await buildCheckoutPayload(
+                existingOrder,
+                existingOrder.amount,
+              );
+              return res.status(200).json({ ...payload, reused: true });
             }
 
             // attempted — UPI was tried and failed; must create a fresh order id.
@@ -258,13 +279,10 @@ export default async function handler(req, res) {
       }
     }
 
+    const payload = await buildCheckoutPayload(order, finalAmountPaise);
+
     return res.status(200).json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: publicKey,
-      session_id,
-      return_url: return_url || null,
+      ...payload,
       reused: false,
     });
   } catch (error) {

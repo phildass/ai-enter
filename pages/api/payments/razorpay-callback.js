@@ -1,5 +1,9 @@
+import crypto from 'crypto';
+import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
+import { getRazorpayCredentialsForApp } from '../../../lib/payments';
+import { verifyPaymentLinkCallbackSignature } from '../../../lib/razorpayPaymentLink';
 
 const DEFAULT_REDIRECTS = {
   iiskills: 'https://iiskills.in/dashboard',
@@ -11,61 +15,52 @@ function redirect(res, url) {
   res.end();
 }
 
-/**
- * Razorpay POST callback for mobile UPI / redirect flows.
- * Razorpay sends razorpay_order_id, razorpay_payment_id, razorpay_signature.
- */
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+function paymentErrorRedirect(res, message) {
+  return redirect(
+    res,
+    `/payments/success?error=${encodeURIComponent(message || 'Payment failed')}`,
+  );
+}
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return redirect(
-      res,
-      `/payments/success?error=${encodeURIComponent('Missing payment details from Razorpay')}`,
-    );
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  let transaction = null;
-  if (supabaseUrl && serviceRoleKey) {
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-    const { data, error } = await supabase
+async function loadTransaction(supabase, { orderId, referenceId }) {
+  if (orderId) {
+    const { data } = await supabase
       .from('payment_transactions')
-      .select('app_name, session_id, course, handoff_token, status, return_url')
-      .eq('razorpay_order_id', razorpay_order_id)
+      .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+      .eq('razorpay_order_id', orderId)
       .maybeSingle();
-
-    if (error) {
-      console.error('[razorpay-callback] Supabase lookup failed:', error.message);
-    } else {
-      transaction = data;
-    }
+    if (data) return data;
   }
 
+  if (referenceId) {
+    const { data } = await supabase
+      .from('payment_transactions')
+      .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+      .eq('session_id', referenceId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (data?.[0]) return data[0];
+  }
+
+  return null;
+}
+
+async function finalizeAndRedirect(res, { transaction, appName, keySecret, paymentParams }) {
   if (transaction?.status === 'success') {
     const doneUrl =
       transaction.return_url ||
-      DEFAULT_REDIRECTS[transaction.app_name] ||
-      `/payments/success?app=${encodeURIComponent(transaction.app_name || 'iiskills')}`;
+      DEFAULT_REDIRECTS[appName] ||
+      DEFAULT_REDIRECTS.iiskills;
     return redirect(res, doneUrl);
   }
 
-  const appName = transaction?.app_name;
   const handoffToken = transaction?.handoff_token;
-  const purchaseId = transaction?.session_id;
+  const purchaseId = transaction?.session_id || paymentParams.purchaseId;
 
   let result;
   try {
     result = await completeVerifiedPayment({
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
+      ...paymentParams,
       purchaseId,
       course: transaction?.course,
       iiskills_token: appName === 'iiskills' ? handoffToken : undefined,
@@ -74,17 +69,11 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error('[razorpay-callback] Verification error:', err);
-    return redirect(
-      res,
-      `/payments/success?error=${encodeURIComponent('Payment verification failed')}`,
-    );
+    return paymentErrorRedirect(res, 'Payment verification failed');
   }
 
   if (!result.ok) {
-    return redirect(
-      res,
-      `/payments/success?error=${encodeURIComponent(result.error || 'Payment verification failed')}`,
-    );
+    return paymentErrorRedirect(res, result.error || 'Payment verification failed');
   }
 
   if (result.confirmFailed) {
@@ -99,7 +88,131 @@ export default async function handler(req, res) {
     result.redirect_url ||
     transaction?.return_url ||
     DEFAULT_REDIRECTS[appName] ||
-    `/payments/success?app=${encodeURIComponent(appName || 'iiskills')}`;
+    DEFAULT_REDIRECTS.iiskills;
 
   return redirect(res, destination);
+}
+
+/**
+ * Razorpay callback — payment links (GET, mobile-friendly) and legacy checkout (POST).
+ */
+export default async function handler(req, res) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabase =
+    supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
+
+  // Payment Link success redirect (hosted checkout — recommended for mobile UPI)
+  if (req.method === 'GET' && req.query.razorpay_payment_link_id) {
+    const {
+      razorpay_payment_id,
+      razorpay_payment_link_id,
+      razorpay_payment_link_reference_id,
+      razorpay_payment_link_status,
+      razorpay_signature,
+    } = req.query;
+
+    if (razorpay_payment_link_status !== 'paid') {
+      return paymentErrorRedirect(res, 'Payment was not completed');
+    }
+
+    if (
+      !razorpay_payment_id ||
+      !razorpay_payment_link_id ||
+      !razorpay_payment_link_reference_id ||
+      !razorpay_signature
+    ) {
+      return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
+    }
+
+    let transaction = null;
+    if (supabase) {
+      transaction = await loadTransaction(supabase, {
+        referenceId: razorpay_payment_link_reference_id,
+      });
+    }
+
+    const appName = transaction?.app_name || 'iiskills';
+    const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
+    if (!keySecret) {
+      return paymentErrorRedirect(res, 'Payment system not configured');
+    }
+
+    if (
+      !verifyPaymentLinkCallbackSignature(
+        {
+          razorpay_payment_link_id,
+          razorpay_payment_link_reference_id,
+          razorpay_payment_link_status,
+          razorpay_payment_id,
+          razorpay_signature,
+        },
+        keySecret,
+      )
+    ) {
+      console.error('[razorpay-callback] Invalid payment link signature');
+      return paymentErrorRedirect(res, 'Invalid payment signature');
+    }
+
+    const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    let orderId = transaction?.razorpay_order_id;
+
+    try {
+      const payment = await razorpay.payments.fetch(razorpay_payment_id);
+      orderId = payment.order_id || orderId;
+    } catch (err) {
+      console.error('[razorpay-callback] Failed to fetch payment:', err.message);
+      return paymentErrorRedirect(res, 'Unable to verify payment');
+    }
+
+    if (!orderId) {
+      return paymentErrorRedirect(res, 'Missing order for payment');
+    }
+
+    const orderSignature = crypto
+      .createHmac('sha256', keySecret)
+      .update(`${orderId}|${razorpay_payment_id}`)
+      .digest('hex');
+
+    return finalizeAndRedirect(res, {
+      transaction,
+      appName,
+      keySecret,
+      paymentParams: {
+        razorpay_order_id: orderId,
+        razorpay_payment_id,
+        razorpay_signature: orderSignature,
+        purchaseId: razorpay_payment_link_reference_id,
+      },
+    });
+  }
+
+  // Legacy Standard Checkout POST callback
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
+  }
+
+  let transaction = null;
+  if (supabase) {
+    transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
+  }
+
+  const appName = transaction?.app_name || 'iiskills';
+
+  return finalizeAndRedirect(res, {
+    transaction,
+    appName,
+    paymentParams: {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      purchaseId: transaction?.session_id,
+    },
+  });
 }
