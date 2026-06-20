@@ -10,7 +10,29 @@ import { useRouter } from 'next/router';
 // - Keep behavior: only verify on success handler; cancel/fail do not verify.
 
 function getApiBaseUrl() {
+  // Payment API routes are on the same Next.js host as this page. Using relative
+  // paths avoids broken builds where NEXT_PUBLIC_API_BASE_URL points elsewhere.
+  if (typeof window !== 'undefined') return '';
   return (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+}
+
+async function readJsonResponse(res) {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const isHtml = /^\s*</.test(text);
+    throw new Error(
+      isHtml
+        ? `Payment server unavailable (HTTP ${res.status}). Please try again in a moment.`
+        : `Payment server returned an unexpected response (HTTP ${res.status}).`,
+    );
+  }
+}
+
+function isMobileCheckout() {
+  if (typeof window === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent);
 }
 
 function fetchWithTimeout(url, options) {
@@ -27,6 +49,7 @@ const COURSE_LABELS = {
   'learn-developer': 'Learn Developer',
   'learn-pr': 'Learn PR',
   'learn-management': 'Learn Management',
+  'skills-passport': 'Skills Passport',
   'all-courses-bundle': 'All Courses (5 Paid Apps)',
 };
 
@@ -164,7 +187,7 @@ export default function SegmentPaymentPage({
       }
 
 
-      const createJson = await createRes.json();
+      const createJson = await readJsonResponse(createRes);
       if (!createRes.ok) {
         console.error('[payment] Order creation failed:', createJson?.error);
         if (createRes.status === 409) {
@@ -199,6 +222,8 @@ export default function SegmentPaymentPage({
 
         setStatusText('Payment window opened — complete payment to continue…');
 
+        const mobileCheckout = isMobileCheckout();
+        const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
 
         const options = {
           key: createJson.keyId,
@@ -207,8 +232,17 @@ export default function SegmentPaymentPage({
           name: brandName,
           description,
           order_id: createJson.orderId,
+          ...(mobileCheckout
+            ? {
+                callback_url: callbackUrl,
+                redirect: true,
+              }
+            : {}),
 
           handler: async function (resp) {
+            // Mobile UPI opens an external app; Razorpay uses callback_url instead.
+            if (mobileCheckout) return;
+
             try {
               // Guard: only verify on a real success callback with required IDs.
               if (
@@ -246,7 +280,11 @@ export default function SegmentPaymentPage({
           modal: {
             ondismiss: function () {
               console.log('[payment] Checkout modal dismissed');
-              // Make cancel explicit; do NOT verify, do NOT redirect.
+              if (mobileCheckout) {
+                // Switching to a UPI app can dismiss the modal before callback completes.
+                setStatusText('If you completed UPI payment, please wait…');
+                return;
+              }
               setError('Payment cancelled. No money was debited.');
               setProcessing(false);
               setStatusText('');
@@ -361,7 +399,7 @@ export default function SegmentPaymentPage({
       return;
     }
 
-    const json = await res.json();
+    const json = await readJsonResponse(res);
 
     if (json?.success && json?.confirmFailed) {
       console.error(

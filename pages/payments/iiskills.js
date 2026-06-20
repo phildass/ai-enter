@@ -12,6 +12,7 @@ const COURSE_LABELS = {
   'learn-developer': 'Learn Developer',
   'learn-pr': 'Learn PR',
   'learn-management': 'Learn Management',
+  'skills-passport': 'Skills Passport',
 };
 
 const DIRECT_ACCESS_ERROR = {
@@ -81,7 +82,7 @@ export default function IisSkillsPaymentsPage({
 
   const bundleFeatures = [
     'All 5 paid apps for the price of 1',
-    'Learn AI, Developer, PR, Management & Aptitude',
+    'Learn AI, Developer, PR, Management & Skills Passport',
     'Limited time 5-for-1 launch offer',
     'Access valid till June 30, 2026',
   ];

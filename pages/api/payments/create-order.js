@@ -18,6 +18,7 @@ export default async function handler(req, res) {
     user_phone,
     customer_name,
     session_id,
+    handoff_token,
     amount_paise,
     currency,
     validity_days,
@@ -53,6 +54,7 @@ export default async function handler(req, res) {
 
     // For iiskills, session_id == purchaseId
     session_id = payload.purchaseId;
+    handoff_token = req.body.iiskills_token;
   } else if (req.body.session_token) {
     // Token-based flow (jai-bharat, jai-kisan, iisacademy)
     let payload;
@@ -67,6 +69,7 @@ export default async function handler(req, res) {
     user_phone = payload.user_phone;
     customer_name = payload.customer_name || '';
     session_id = payload.session_id;
+    handoff_token = req.body.session_token;
     amount_paise = payload.amount_paise;
     currency = payload.currency;
     validity_days = payload.validity_days;
@@ -197,6 +200,7 @@ export default async function handler(req, res) {
         validity_days: validity_days || 30,
         return_url: return_url || null,
         course: course || null,
+        handoff_token: handoff_token || null,
         status: 'pending',
       });
 
