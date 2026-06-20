@@ -4,13 +4,18 @@ import { createClient } from '@supabase/supabase-js';
 import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
 import { getRazorpayCredentialsForApp } from '../../../lib/payments';
 import { verifyPaymentLinkCallbackSignature } from '../../../lib/razorpayPaymentLink';
+import { assertPaymentCaptured } from '../../../lib/razorpayCapture';
 
 const DEFAULT_REDIRECTS = {
   iiskills: 'https://iiskills.in/dashboard',
   'uriq.in': 'https://uriq.in/dashboard',
 };
 
+const TX_SELECT =
+  'app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id, razorpay_payment_id';
+
 function redirect(res, url) {
+  res.setHeader('Cache-Control', 'no-store');
   res.writeHead(303, { Location: url });
   res.end();
 }
@@ -33,7 +38,7 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
   if (orderId) {
     const { data } = await supabase
       .from('payment_transactions')
-      .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+      .select(TX_SELECT)
       .eq('razorpay_order_id', orderId)
       .maybeSingle();
     if (data) return data;
@@ -42,7 +47,7 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
   if (referenceId) {
     const { data: exact } = await supabase
       .from('payment_transactions')
-      .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+      .select(TX_SELECT)
       .eq('session_id', referenceId)
       .order('created_at', { ascending: false })
       .limit(1);
@@ -52,7 +57,7 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
     if (baseSessionId && baseSessionId !== referenceId) {
       const { data: byBase } = await supabase
         .from('payment_transactions')
-        .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+        .select(TX_SELECT)
         .eq('session_id', baseSessionId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
@@ -79,32 +84,26 @@ function verifyOrderSignature(orderId, paymentId, signature, keySecret) {
   }
 }
 
-async function assertPaymentCaptured(razorpay, paymentId, expectedOrderId) {
-  const payment = await razorpay.payments.fetch(paymentId);
-
-  if (payment.status !== 'captured') {
-    return {
-      ok: false,
-      pending: payment.status === 'authorized' || payment.status === 'created',
-      error: 'Payment was not completed',
-      payment,
-    };
-  }
-
-  if (expectedOrderId && payment.order_id && payment.order_id !== expectedOrderId) {
-    return {
-      ok: false,
-      pending: false,
-      error: 'Payment does not match this order',
-      payment,
-    };
-  }
-
-  return { ok: true, payment };
+function buildOrderSignature(orderId, paymentId, keySecret) {
+  return crypto.createHmac('sha256', keySecret).update(`${orderId}|${paymentId}`).digest('hex');
 }
 
-async function finalizeAndRedirect(res, { transaction, appName, keySecret, paymentParams }) {
+async function finalizeAndRedirect(res, { transaction, appName, paymentParams }) {
+  const incomingPaymentId = paymentParams.razorpay_payment_id;
+
+  // Idempotent redirect only when the same captured payment is replayed.
   if (transaction?.status === 'success') {
+    if (
+      transaction.razorpay_payment_id &&
+      incomingPaymentId &&
+      transaction.razorpay_payment_id !== incomingPaymentId
+    ) {
+      console.warn(
+        `[razorpay-callback] success tx payment mismatch stored=${transaction.razorpay_payment_id} incoming=${incomingPaymentId}`,
+      );
+      return paymentPendingRedirect(res, appName);
+    }
+
     const doneUrl =
       transaction.return_url || DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
     return redirect(res, doneUrl);
@@ -122,6 +121,7 @@ async function finalizeAndRedirect(res, { transaction, appName, keySecret, payme
       iiskills_token: appName === 'iiskills' ? handoffToken : undefined,
       uriq_token: appName === 'uriq.in' ? handoffToken : undefined,
       app_name: appName,
+      entitlement_source: 'callback',
     });
   } catch (err) {
     console.error('[razorpay-callback] Verification error:', err);
@@ -129,7 +129,7 @@ async function finalizeAndRedirect(res, { transaction, appName, keySecret, payme
   }
 
   if (!result.ok) {
-    if (result.error?.includes('not captured')) {
+    if (result.error?.includes('not captured') || result.error?.includes('not captured yet')) {
       return paymentPendingRedirect(res, appName);
     }
     return paymentErrorRedirect(res, result.error || 'Payment verification failed');
@@ -156,6 +156,10 @@ async function handleStandardCheckoutCallback(
   res,
   { supabase, razorpay_order_id, razorpay_payment_id, razorpay_signature },
 ) {
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
+  }
+
   let transaction = null;
   if (supabase) {
     transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
@@ -185,7 +189,7 @@ async function handleStandardCheckoutCallback(
 
   if (!captureCheck.ok) {
     console.log(
-      `[razorpay-callback] payment not captured: id=${razorpay_payment_id} status=${captureCheck.payment?.status}`,
+      `[razorpay-callback] blocked non-captured payment: id=${razorpay_payment_id} status=${captureCheck.payment?.status}`,
     );
     if (captureCheck.pending) {
       return paymentPendingRedirect(res, appName);
@@ -196,7 +200,6 @@ async function handleStandardCheckoutCallback(
   return finalizeAndRedirect(res, {
     transaction,
     appName,
-    keySecret,
     paymentParams: {
       razorpay_order_id,
       razorpay_payment_id,
@@ -207,10 +210,12 @@ async function handleStandardCheckoutCallback(
 }
 
 /**
- * Razorpay callback — payment links (GET) and Standard Checkout redirect (GET/POST).
- * Never finalizes unless Razorpay reports payment.status === 'captured'.
+ * Razorpay redirect callback — entitlements only after API-verified captured status.
+ * No Supabase auth cookies; payment identity is JWT handoff_token in payment_transactions.
  */
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabase =
@@ -295,6 +300,9 @@ export default async function handler(req, res) {
     }
 
     if (!captureCheck.ok) {
+      console.log(
+        `[razorpay-callback] blocked non-captured payment link payment: status=${captureCheck.payment?.status}`,
+      );
       if (captureCheck.pending) {
         return paymentPendingRedirect(res, appName);
       }
@@ -310,25 +318,18 @@ export default async function handler(req, res) {
       transaction = (await loadTransaction(supabase, { orderId })) || transaction;
     }
 
-    const orderSignature = crypto
-      .createHmac('sha256', keySecret)
-      .update(`${orderId}|${razorpay_payment_id}`)
-      .digest('hex');
-
     return finalizeAndRedirect(res, {
       transaction,
       appName,
-      keySecret,
       paymentParams: {
         razorpay_order_id: orderId,
         razorpay_payment_id,
-        razorpay_signature: orderSignature,
+        razorpay_signature: buildOrderSignature(orderId, razorpay_payment_id, keySecret),
         purchaseId: transaction?.session_id || razorpay_payment_link_reference_id,
       },
     });
   }
 
-  // Standard Checkout redirect (mobile callback_url — some clients use GET query params)
   if (
     req.method === 'GET' &&
     req.query.razorpay_payment_id &&
@@ -343,16 +344,11 @@ export default async function handler(req, res) {
     });
   }
 
-  // Standard Checkout POST callback (redirect mode)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
-  }
 
   return handleStandardCheckoutCallback(res, {
     supabase,

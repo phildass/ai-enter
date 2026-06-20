@@ -5,8 +5,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // iiskills/uriq JWT flows must confirm only via Razorpay callback/webhook after capture.
+  if (req.body?.iiskills_token || req.body?.uriq_token) {
+    return res.status(403).json({
+      error:
+        'This payment must complete via Razorpay redirect. Entitlements are granted only after captured payment is verified server-side.',
+    });
+  }
+
   try {
-    const result = await completeVerifiedPayment(req.body);
+    const result = await completeVerifiedPayment({
+      ...req.body,
+      entitlement_source: 'client',
+    });
 
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });

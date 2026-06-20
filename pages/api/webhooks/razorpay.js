@@ -1,37 +1,19 @@
 import crypto from 'crypto';
+import Razorpay from 'razorpay';
+import { createClient } from '@supabase/supabase-js';
+import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
+import { getRazorpayCredentialsForApp } from '../../../lib/payments';
+import {
+  assertPaymentCaptured,
+  isEntitlementWebhookEvent,
+} from '../../../lib/razorpayCapture';
 
-/**
- * Razorpay webhook endpoint
- *
- * Razorpay delivers signed POST requests to this URL.
- * Configure the webhook URL in the Razorpay Dashboard:
- *   https://dashboard.razorpay.com/app/webhooks
- *
- * Set the webhook URL to: https://aienter.in/api/webhooks/razorpay
- * Copy the webhook secret from the dashboard into RAZORPAY_WEBHOOK_SECRET.
- *
- * Signature verification:
- *   HMAC-SHA256(rawBody, RAZORPAY_WEBHOOK_SECRET) must equal
- *   the X-Razorpay-Signature header value.
- *
- * Returns:
- *   200  – webhook received and signature verified
- *   400  – missing/invalid signature or malformed body
- *   405  – method not allowed (non-POST)
- *   500  – server misconfiguration (webhook secret not set)
- */
-
-// Disable Next.js built-in body parsing so we can read the raw bytes
-// needed for accurate HMAC signature verification.
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-/**
- * Read the full request body as a Buffer.
- */
 function readRawBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -41,6 +23,10 @@ function readRawBody(req) {
   });
 }
 
+/**
+ * Razorpay webhook — grant entitlements ONLY on payment.captured.
+ * Ignores payment.authorized and all other events (no confirm on UPI intent).
+ */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -86,14 +72,99 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Invalid JSON body' });
   }
 
-  // Log only the event type — never log the full payload which may contain
-  // sensitive customer or payment data.
   const eventType = event?.event ?? 'unknown';
   console.log('[razorpay-webhook] Received event:', eventType);
 
-  // Acknowledge receipt to Razorpay.
-  // Server-side event processing (e.g. marking orders as paid, sending
-  // receipts) can be added here as a reliable server-to-server fallback,
-  // independent of the client-side /api/payments/verify-payment flow.
-  return res.status(200).json({ received: true });
+  if (!isEntitlementWebhookEvent(eventType)) {
+    if (eventType === 'payment.authorized') {
+      console.log('[razorpay-webhook] Ignoring payment.authorized — waiting for payment.captured');
+    }
+    return res.status(200).json({ received: true, action: 'ignored', event: eventType });
+  }
+
+  const paymentEntity = event?.payload?.payment?.entity;
+  const razorpay_order_id = paymentEntity?.order_id;
+  const razorpay_payment_id = paymentEntity?.id;
+
+  if (!razorpay_order_id || !razorpay_payment_id) {
+    console.error('[razorpay-webhook] payment.captured missing order_id or payment id');
+    return res.status(200).json({ received: true, action: 'skipped', reason: 'missing_ids' });
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return res.status(200).json({ received: true, action: 'skipped', reason: 'no_supabase' });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const { data: transaction } = await supabase
+    .from('payment_transactions')
+    .select('app_name, session_id, course, handoff_token, status, razorpay_payment_id')
+    .eq('razorpay_order_id', razorpay_order_id)
+    .maybeSingle();
+
+  const appName = transaction?.app_name || paymentEntity?.notes?.app_name || 'iiskills';
+  const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
+
+  if (!keySecret) {
+    console.error('[razorpay-webhook] No credentials for app:', appName);
+    return res.status(200).json({ received: true, action: 'skipped', reason: 'no_credentials' });
+  }
+
+  if (
+    transaction?.status === 'success' &&
+    transaction.razorpay_payment_id === razorpay_payment_id
+  ) {
+    return res.status(200).json({ received: true, action: 'already_processed' });
+  }
+
+  const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
+  let captureCheck;
+  try {
+    captureCheck = await assertPaymentCaptured(razorpay, razorpay_payment_id, razorpay_order_id);
+  } catch (err) {
+    console.error('[razorpay-webhook] payment fetch failed:', err.message);
+    return res.status(200).json({ received: true, action: 'skipped', reason: 'fetch_failed' });
+  }
+
+  if (!captureCheck.ok) {
+    console.log(
+      `[razorpay-webhook] blocked non-captured: id=${razorpay_payment_id} status=${captureCheck.payment?.status}`,
+    );
+    return res.status(200).json({ received: true, action: 'ignored', reason: 'not_captured' });
+  }
+
+  const razorpay_signature = crypto
+    .createHmac('sha256', keySecret)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest('hex');
+
+  try {
+    const result = await completeVerifiedPayment({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      purchaseId: transaction?.session_id,
+      course: transaction?.course,
+      iiskills_token: appName === 'iiskills' ? transaction?.handoff_token : undefined,
+      uriq_token: appName === 'uriq.in' ? transaction?.handoff_token : undefined,
+      app_name: appName,
+      entitlement_source: 'webhook',
+    });
+
+    if (!result.ok) {
+      console.error('[razorpay-webhook] completeVerifiedPayment failed:', result.error);
+      return res.status(200).json({ received: true, action: 'failed', error: result.error });
+    }
+
+    return res.status(200).json({
+      received: true,
+      action: result.confirmFailed ? 'confirm_failed' : 'completed',
+    });
+  } catch (err) {
+    console.error('[razorpay-webhook] handler error:', err.message);
+    return res.status(200).json({ received: true, action: 'error' });
+  }
 }

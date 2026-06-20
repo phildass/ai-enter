@@ -2,9 +2,9 @@ import React, { useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-// iiskills: Standard Checkout with redirect:true (full Razorpay page, not modal).
-// Confirmation runs only server-side from /api/payments/razorpay-callback after capture.
-// Modal checkout.js fires false success/cancel when opening GPay/PhonePe on mobile.
+// External-token apps (iiskills, uriq): Standard Checkout redirect:true (full Razorpay page).
+// Entitlements run only from /api/payments/razorpay-callback or webhook after capture.
+// No shared auth cookies — identity is the JWT handoff token stored with the order.
 
 function isMobileCheckout() {
   if (typeof window === 'undefined') return false;
@@ -118,14 +118,20 @@ const PHONE_RE = /^\d{10}$/;
 const CHECKOUT_SESSION_KEY = 'aienter_checkout_session';
 
 function persistCheckoutSession(snapshot) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return false;
+  if (!snapshot?.orderId) {
+    console.warn('[payment] Refusing to persist checkout session: missing orderId');
+    return false;
+  }
   try {
     sessionStorage.setItem(
       CHECKOUT_SESSION_KEY,
       JSON.stringify({ ...snapshot, savedAt: Date.now() }),
     );
+    return true;
   } catch (e) {
     console.warn('[payment] Could not persist checkout session:', e);
+    return false;
   }
 }
 
@@ -287,7 +293,7 @@ export default function SegmentPaymentPage({
     (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
-  const usesRedirectCheckout = activeTokenKind === 'iiskills';
+  const usesRedirectCheckout = isExternalTokenSegment;
 
   // Main pay action — guarded so create-order cannot fire twice per interaction.
   const startPayment = async () => {
@@ -397,18 +403,23 @@ export default function SegmentPaymentPage({
       }
       if (userEmailFromToken) prefill.email = userEmailFromToken;
 
-      // iiskills: full-page Razorpay checkout — user pays in UPI app, server callback confirms.
+      // External-token apps: full-page Razorpay checkout — entitlements via server callback only.
       if (usesRedirectCheckout) {
         setStatusText('Redirecting to secure payment…');
 
-        persistCheckoutSession({
+        const persisted = persistCheckoutSession({
           orderId: createJson.orderId,
           purchaseId,
           course,
           segmentKey,
           activeTokenKind,
+          rawToken: rawToken || null,
           returnUrl: createJson.return_url || null,
         });
+
+        if (!persisted) {
+          throw new Error('Could not save checkout session. Please try again.');
+        }
 
         const options = {
           key: createJson.keyId,
@@ -449,6 +460,7 @@ export default function SegmentPaymentPage({
         course,
         segmentKey,
         activeTokenKind,
+        rawToken: rawToken || null,
         returnUrl: createJson.return_url || null,
       });
 

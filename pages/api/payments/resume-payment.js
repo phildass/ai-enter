@@ -128,6 +128,7 @@ export default async function handler(req, res) {
       iiskills_token: appName === 'iiskills' ? token : undefined,
       uriq_token: appName === 'uriq.in' ? token : undefined,
       app_name: appName,
+      entitlement_source: 'resume',
     });
 
     if (!result.ok) {
