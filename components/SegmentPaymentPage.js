@@ -115,6 +115,29 @@ const COURSE_LABELS = {
 
 const PHONE_RE = /^\d{10}$/;
 
+const CHECKOUT_SESSION_KEY = 'aienter_checkout_session';
+
+function persistCheckoutSession(snapshot) {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(
+      CHECKOUT_SESSION_KEY,
+      JSON.stringify({ ...snapshot, savedAt: Date.now() }),
+    );
+  } catch (e) {
+    console.warn('[payment] Could not persist checkout session:', e);
+  }
+}
+
+function clearCheckoutSession() {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.removeItem(CHECKOUT_SESSION_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 const DASHBOARD_URLS = {
   iiskills: 'https://iiskills.in/dashboard',
   'uriq.in': 'https://uriq.in/dashboard',
@@ -183,6 +206,7 @@ export default function SegmentPaymentPage({
   const needsFreshOrderRef = useRef(false);
   const pendingCheckoutRef = useRef(null);
   const resumeInFlightRef = useRef(false);
+  const paymentInFlightRef = useRef(false);
 
   const tryResumePayment = async () => {
     const pending = pendingCheckoutRef.current;
@@ -214,6 +238,7 @@ export default function SegmentPaymentPage({
 
       if (json?.paid && json?.redirect_url) {
         pendingCheckoutRef.current = null;
+        clearCheckoutSession();
         setAwaitingUpiReturn(false);
         setStatusText('Redirecting…');
         finishPaymentRedirect(json.redirect_url);
@@ -264,8 +289,14 @@ export default function SegmentPaymentPage({
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
   const usesRedirectCheckout = activeTokenKind === 'iiskills';
 
-  // Main pay action
+  // Main pay action — guarded so create-order cannot fire twice per interaction.
   const startPayment = async () => {
+    if (paymentInFlightRef.current || processing) {
+      console.log('[payment] Ignoring duplicate Pay tap');
+      return;
+    }
+    paymentInFlightRef.current = true;
+
     setProcessing(true);
     setStatusText('Creating order…');
     setError('');
@@ -273,6 +304,7 @@ export default function SegmentPaymentPage({
     setConfirmRetryPayload(null);
 
     const apiBase = getApiBaseUrl();
+    let leavingForCheckout = false;
 
     try {
       let body;
@@ -334,6 +366,7 @@ export default function SegmentPaymentPage({
           setError(createJson?.error || 'This payment link has already been used. Please start a new purchase.');
           setProcessing(false);
           setStatusText('');
+          paymentInFlightRef.current = false;
           return;
         }
         throw new Error(createJson?.error || 'Payment could not be initiated. Please try again.');
@@ -350,6 +383,7 @@ export default function SegmentPaymentPage({
         setError('Failed to load payment gateway. Please try again.');
         setProcessing(false);
         setStatusText('');
+        paymentInFlightRef.current = false;
         return;
       }
 
@@ -367,6 +401,15 @@ export default function SegmentPaymentPage({
       if (usesRedirectCheckout) {
         setStatusText('Redirecting to secure payment…');
 
+        persistCheckoutSession({
+          orderId: createJson.orderId,
+          purchaseId,
+          course,
+          segmentKey,
+          activeTokenKind,
+          returnUrl: createJson.return_url || null,
+        });
+
         const options = {
           key: createJson.keyId,
           amount: createJson.amount,
@@ -383,6 +426,7 @@ export default function SegmentPaymentPage({
 
         const rzp = new window.Razorpay(options);
         rzp.open();
+        leavingForCheckout = true;
         return;
       }
 
@@ -398,6 +442,15 @@ export default function SegmentPaymentPage({
         rawToken,
         segmentKey,
       };
+
+      persistCheckoutSession({
+        orderId: createJson.orderId,
+        purchaseId,
+        course,
+        segmentKey,
+        activeTokenKind,
+        returnUrl: createJson.return_url || null,
+      });
 
       const options = {
         key: createJson.keyId,
@@ -427,6 +480,7 @@ export default function SegmentPaymentPage({
             }
 
             pendingCheckoutRef.current = null;
+            clearCheckoutSession();
             setAwaitingUpiReturn(false);
             setStatusText('Verifying payment…');
 
@@ -448,6 +502,7 @@ export default function SegmentPaymentPage({
           escape: false,
           backdropclose: false,
           ondismiss: function () {
+            paymentInFlightRef.current = false;
             if (pendingCheckoutRef.current) {
               setAwaitingUpiReturn(true);
               setError('');
@@ -455,6 +510,7 @@ export default function SegmentPaymentPage({
               setStatusText('');
               return;
             }
+            clearCheckoutSession();
             setError('Payment cancelled. No money was debited.');
             setProcessing(false);
             setStatusText('');
@@ -475,8 +531,10 @@ export default function SegmentPaymentPage({
           return;
         }
 
+        paymentInFlightRef.current = false;
         needsFreshOrderRef.current = true;
         pendingCheckoutRef.current = null;
+        clearCheckoutSession();
         setAwaitingUpiReturn(false);
 
         const msg =
@@ -490,12 +548,19 @@ export default function SegmentPaymentPage({
       });
 
       rzp.open();
+      if (mobileCheckout) {
+        leavingForCheckout = true;
+      }
       return;
     } catch (e) {
       console.error('[payment] Unexpected error:', e);
       setError(e?.message || 'Payment failed. Please try again.');
       setProcessing(false);
       setStatusText('');
+    } finally {
+      if (!leavingForCheckout) {
+        paymentInFlightRef.current = false;
+      }
     }
   };
 
@@ -599,6 +664,7 @@ export default function SegmentPaymentPage({
 
     if (json?.success) {
       console.log('[payment] Verification successful, redirecting');
+      clearCheckoutSession();
       setStatusText('Redirecting…');
 
       const redirect =
