@@ -22,6 +22,13 @@ function paymentErrorRedirect(res, message) {
   );
 }
 
+function paymentPendingRedirect(res, appName) {
+  return redirect(
+    res,
+    `/payments/success?pending=1&app=${encodeURIComponent(appName || 'iiskills')}`,
+  );
+}
+
 async function loadTransaction(supabase, { orderId, referenceId }) {
   if (orderId) {
     const { data } = await supabase
@@ -41,7 +48,6 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
       .limit(1);
     if (exact?.[0]) return exact[0];
 
-    // reference_id may be purchaseId_suffix from buildUniqueReferenceId
     const baseSessionId = referenceId.replace(/_[a-z0-9]+$/i, '');
     if (baseSessionId && baseSessionId !== referenceId) {
       const { data: byBase } = await supabase
@@ -58,12 +64,49 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
   return null;
 }
 
+function verifyOrderSignature(orderId, paymentId, signature, keySecret) {
+  if (!orderId || !paymentId || !signature || !keySecret) return false;
+  const expected = crypto
+    .createHmac('sha256', keySecret)
+    .update(`${orderId}|${paymentId}`)
+    .digest('hex');
+  try {
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    return sigBuf.length === expectedBuf.length && crypto.timingSafeEqual(sigBuf, expectedBuf);
+  } catch {
+    return false;
+  }
+}
+
+async function assertPaymentCaptured(razorpay, paymentId, expectedOrderId) {
+  const payment = await razorpay.payments.fetch(paymentId);
+
+  if (payment.status !== 'captured') {
+    return {
+      ok: false,
+      pending: payment.status === 'authorized' || payment.status === 'created',
+      error: 'Payment was not completed',
+      payment,
+    };
+  }
+
+  if (expectedOrderId && payment.order_id && payment.order_id !== expectedOrderId) {
+    return {
+      ok: false,
+      pending: false,
+      error: 'Payment does not match this order',
+      payment,
+    };
+  }
+
+  return { ok: true, payment };
+}
+
 async function finalizeAndRedirect(res, { transaction, appName, keySecret, paymentParams }) {
   if (transaction?.status === 'success') {
     const doneUrl =
-      transaction.return_url ||
-      DEFAULT_REDIRECTS[appName] ||
-      DEFAULT_REDIRECTS.iiskills;
+      transaction.return_url || DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
     return redirect(res, doneUrl);
   }
 
@@ -86,6 +129,9 @@ async function finalizeAndRedirect(res, { transaction, appName, keySecret, payme
   }
 
   if (!result.ok) {
+    if (result.error?.includes('not captured')) {
+      return paymentPendingRedirect(res, appName);
+    }
     return paymentErrorRedirect(res, result.error || 'Payment verification failed');
   }
 
@@ -106,8 +152,63 @@ async function finalizeAndRedirect(res, { transaction, appName, keySecret, payme
   return redirect(res, destination);
 }
 
+async function handleStandardCheckoutCallback(
+  res,
+  { supabase, razorpay_order_id, razorpay_payment_id, razorpay_signature },
+) {
+  let transaction = null;
+  if (supabase) {
+    transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
+  }
+
+  const appName = transaction?.app_name || 'iiskills';
+  const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
+
+  if (!keySecret) {
+    return paymentErrorRedirect(res, 'Payment system not configured');
+  }
+
+  if (!verifyOrderSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, keySecret)) {
+    console.error('[razorpay-callback] Invalid standard checkout signature');
+    return paymentErrorRedirect(res, 'Invalid payment signature');
+  }
+
+  const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
+
+  let captureCheck;
+  try {
+    captureCheck = await assertPaymentCaptured(razorpay, razorpay_payment_id, razorpay_order_id);
+  } catch (err) {
+    console.error('[razorpay-callback] payment fetch failed:', err.message);
+    return paymentErrorRedirect(res, 'Unable to verify payment');
+  }
+
+  if (!captureCheck.ok) {
+    console.log(
+      `[razorpay-callback] payment not captured: id=${razorpay_payment_id} status=${captureCheck.payment?.status}`,
+    );
+    if (captureCheck.pending) {
+      return paymentPendingRedirect(res, appName);
+    }
+    return paymentErrorRedirect(res, captureCheck.error);
+  }
+
+  return finalizeAndRedirect(res, {
+    transaction,
+    appName,
+    keySecret,
+    paymentParams: {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      purchaseId: transaction?.session_id,
+    },
+  });
+}
+
 /**
- * Razorpay callback — payment links (GET, mobile-friendly) and legacy checkout (POST).
+ * Razorpay callback — payment links (GET) and Standard Checkout redirect (GET/POST).
+ * Never finalizes unless Razorpay reports payment.status === 'captured'.
  */
 export default async function handler(req, res) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -115,7 +216,7 @@ export default async function handler(req, res) {
   const supabase =
     supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
-  // Payment Link success redirect (hosted checkout — recommended for mobile UPI)
+  // Payment Link success redirect (legacy hosted links)
   if (req.method === 'GET' && req.query.razorpay_payment_link_id) {
     const {
       razorpay_payment_id,
@@ -126,7 +227,10 @@ export default async function handler(req, res) {
     } = req.query;
 
     if (razorpay_payment_link_status !== 'paid') {
-      return paymentErrorRedirect(res, 'Payment was not completed');
+      console.log(
+        `[razorpay-callback] payment link not paid: status=${razorpay_payment_link_status}`,
+      );
+      return paymentPendingRedirect(res, 'iiskills');
     }
 
     if (
@@ -168,36 +272,42 @@ export default async function handler(req, res) {
     }
 
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
-    let orderId;
 
+    let paymentLink;
     try {
-      const payment = await razorpay.payments.fetch(razorpay_payment_id);
-      orderId = payment.order_id;
+      paymentLink = await razorpay.paymentLink.fetch(razorpay_payment_link_id);
     } catch (err) {
-      console.error('[razorpay-callback] Failed to fetch payment:', err.message);
+      console.error('[razorpay-callback] payment link fetch failed:', err.message);
       return paymentErrorRedirect(res, 'Unable to verify payment');
     }
 
+    if (paymentLink.status !== 'paid') {
+      console.log(`[razorpay-callback] API payment link status=${paymentLink.status}`);
+      return paymentPendingRedirect(res, appName);
+    }
+
+    let captureCheck;
+    try {
+      captureCheck = await assertPaymentCaptured(razorpay, razorpay_payment_id);
+    } catch (err) {
+      console.error('[razorpay-callback] payment fetch failed:', err.message);
+      return paymentErrorRedirect(res, 'Unable to verify payment');
+    }
+
+    if (!captureCheck.ok) {
+      if (captureCheck.pending) {
+        return paymentPendingRedirect(res, appName);
+      }
+      return paymentErrorRedirect(res, captureCheck.error);
+    }
+
+    const orderId = captureCheck.payment.order_id;
     if (!orderId) {
       return paymentErrorRedirect(res, 'Missing order for payment');
     }
 
-    try {
-      const payment = await razorpay.payments.fetch(razorpay_payment_id);
-      if (payment.status !== 'captured') {
-        return paymentErrorRedirect(res, 'Payment was not completed');
-      }
-      if (payment.order_id && payment.order_id !== orderId) {
-        return paymentErrorRedirect(res, 'Payment does not match this order');
-      }
-    } catch (err) {
-      console.error('[razorpay-callback] payment verify failed:', err.message);
-      return paymentErrorRedirect(res, 'Unable to verify payment');
-    }
-
     if (supabase) {
-      transaction =
-        (await loadTransaction(supabase, { orderId })) || transaction;
+      transaction = (await loadTransaction(supabase, { orderId })) || transaction;
     }
 
     const orderSignature = crypto
@@ -225,28 +335,15 @@ export default async function handler(req, res) {
     req.query.razorpay_order_id &&
     req.query.razorpay_signature
   ) {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.query;
-
-    let transaction = null;
-    if (supabase) {
-      transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
-    }
-
-    const appName = transaction?.app_name || 'iiskills';
-
-    return finalizeAndRedirect(res, {
-      transaction,
-      appName,
-      paymentParams: {
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        purchaseId: transaction?.session_id,
-      },
+    return handleStandardCheckoutCallback(res, {
+      supabase,
+      razorpay_order_id: req.query.razorpay_order_id,
+      razorpay_payment_id: req.query.razorpay_payment_id,
+      razorpay_signature: req.query.razorpay_signature,
     });
   }
 
-  // Standard Checkout POST callback (mobile redirect and desktop)
+  // Standard Checkout POST callback (redirect mode)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -257,21 +354,10 @@ export default async function handler(req, res) {
     return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
   }
 
-  let transaction = null;
-  if (supabase) {
-    transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
-  }
-
-  const appName = transaction?.app_name || 'iiskills';
-
-  return finalizeAndRedirect(res, {
-    transaction,
-    appName,
-    paymentParams: {
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      purchaseId: transaction?.session_id,
-    },
+  return handleStandardCheckoutCallback(res, {
+    supabase,
+    razorpay_order_id,
+    razorpay_payment_id,
+    razorpay_signature,
   });
 }

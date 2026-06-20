@@ -6,16 +6,7 @@ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
-import {
-  createPaymentLinkForOrder,
-  extractCustomerPhone,
-  formatRazorpayError,
-} from '../../../lib/razorpayPaymentLink';
-
-/** Hosted payment page — avoids checkout.js modal UPI cancel/dismiss bugs on mobile. */
-function usesHostedPaymentLink(appName) {
-  return appName === 'iiskills';
-}
+import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -119,14 +110,6 @@ export default async function handler(req, res) {
       });
     }
 
-    const hostedLink = usesHostedPaymentLink(app_name);
-
-    if (hostedLink && !user_phone) {
-      return res.status(400).json({
-        error: 'Valid 10-digit mobile number is required for UPI payment.',
-      });
-    }
-
     const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp(app_name);
     if (!keyId || !keySecret) {
       return res.status(500).json({
@@ -161,30 +144,7 @@ export default async function handler(req, res) {
           });
         }
 
-        if (hostedLink) {
-          // Never reuse Razorpay orders for iiskills — each Pay gets a fresh hosted link.
-          if (row.status === 'pending') {
-            try {
-              const existingOrder = await razorpay.orders.fetch(row.razorpay_order_id);
-              if (existingOrder.status === 'paid') {
-                await supabase
-                  .from('payment_transactions')
-                  .update({ status: 'success', updated_at: new Date().toISOString() })
-                  .eq('id', row.id);
-                return res.status(409).json({
-                  error: 'This payment link has already been used. Please start a new purchase.',
-                });
-              }
-            } catch (fetchErr) {
-              console.error('[create-order] stale order fetch failed:', fetchErr.message);
-            }
-
-            await supabase
-              .from('payment_transactions')
-              .update({ status: 'failed', updated_at: new Date().toISOString() })
-              .eq('id', row.id);
-          }
-        } else if (row.status === 'failed' || freshOrder) {
+        if (row.status === 'failed' || freshOrder) {
           // create a new Razorpay order below
         } else if (row.status === 'pending' && row.razorpay_order_id) {
           try {
@@ -241,60 +201,6 @@ export default async function handler(req, res) {
 
     const finalAmountPaise = amount_paise || 11682;
     const finalCurrency = currency || 'INR';
-
-    if (hostedLink) {
-      const description =
-        course === 'all-courses-bundle'
-          ? 'iiskills — All Courses (5 for 1 till June 30, 2026)'
-          : `iiskills — ${course || 'course'} access`;
-
-      const linkResult = await createPaymentLinkForOrder(razorpay, {
-        referenceId: session_id,
-        amountPaise: finalAmountPaise,
-        currency: finalCurrency,
-        description,
-        customerName: customer_name || 'Customer',
-        customerPhone: user_phone,
-        customerEmail: user_email,
-        appName: app_name,
-      });
-
-      if (supabase) {
-        const { error } = await supabase.from('payment_transactions').insert({
-          user_id: user_id || null,
-          user_email: user_email || null,
-          user_phone: user_phone || null,
-          customer_name: customer_name || null,
-          app_name,
-          session_id,
-          razorpay_order_id: linkResult.orderId,
-          amount: finalAmountPaise / 100,
-          currency: finalCurrency,
-          validity_days: validity_days || 30,
-          return_url: return_url || null,
-          course: course || null,
-          handoff_token: handoff_token || null,
-          status: 'pending',
-        });
-
-        if (error) {
-          console.error('[create-order] Supabase insert failed (non-fatal):', error.message);
-        }
-      }
-
-      return res.status(200).json({
-        orderId: linkResult.orderId,
-        checkoutUrl: linkResult.checkoutUrl,
-        amount: finalAmountPaise,
-        currency: finalCurrency,
-        keyId: publicKey,
-        session_id,
-        return_url: return_url || null,
-        paymentFlow: 'redirect',
-        reused: false,
-      });
-    }
-
     const receiptSuffix = Date.now().toString(36);
 
     const order = await razorpay.orders.create({

@@ -2,8 +2,9 @@ import React, { useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-// iiskills: redirect to Razorpay-hosted payment page (no checkout.js modal).
-// Modal UPI on mobile fires false success/cancel when opening GPay/PhonePe.
+// iiskills: Standard Checkout with redirect:true (full Razorpay page, not modal).
+// Confirmation runs only server-side from /api/payments/razorpay-callback after capture.
+// Modal checkout.js fires false success/cancel when opening GPay/PhonePe on mobile.
 
 function isMobileCheckout() {
   if (typeof window === 'undefined') return false;
@@ -261,7 +262,7 @@ export default function SegmentPaymentPage({
     (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
-  const usesHostedRedirect = activeTokenKind === 'iiskills';
+  const usesRedirectCheckout = activeTokenKind === 'iiskills';
 
   // Main pay action
   const startPayment = async () => {
@@ -341,16 +342,6 @@ export default function SegmentPaymentPage({
       console.log('[payment] Order created:', createJson.orderId, createJson.reused ? '(reused)' : '(new)');
       needsFreshOrderRef.current = false;
 
-      if (createJson.checkoutUrl) {
-        setStatusText('Redirecting to secure payment…');
-        window.location.href = createJson.checkoutUrl;
-        return;
-      }
-
-      if (usesHostedRedirect) {
-        throw new Error('Payment gateway did not return a checkout URL. Please try again.');
-      }
-
       setStatusText('Loading payment gateway…');
 
       try {
@@ -362,10 +353,42 @@ export default function SegmentPaymentPage({
         return;
       }
 
+      const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
+
+      const prefill = {};
+      const contactPhone = extractTokenPhone(tokenPayload) || phone.trim();
+      if (contactPhone) prefill.contact = contactPhone;
+      if (tokenPayload?.name || tokenPayload?.customer_name) {
+        prefill.name = tokenPayload.name || tokenPayload.customer_name;
+      }
+      if (userEmailFromToken) prefill.email = userEmailFromToken;
+
+      // iiskills: full-page Razorpay checkout — user pays in UPI app, server callback confirms.
+      if (usesRedirectCheckout) {
+        setStatusText('Redirecting to secure payment…');
+
+        const options = {
+          key: createJson.keyId,
+          amount: createJson.amount,
+          currency: createJson.currency,
+          name: brandName,
+          description,
+          order_id: createJson.orderId,
+          callback_url: callbackUrl,
+          redirect: true,
+          retry: { enabled: false },
+          ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+          theme: { color: accentColor },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+        return;
+      }
+
       setStatusText('Payment window opened — complete payment to continue…');
 
       const mobileCheckout = isMobileCheckout();
-      const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
 
       pendingCheckoutRef.current = {
         orderId: createJson.orderId,
@@ -375,14 +398,6 @@ export default function SegmentPaymentPage({
         rawToken,
         segmentKey,
       };
-
-      const prefill = {};
-      const contactPhone = extractTokenPhone(tokenPayload);
-      if (contactPhone) prefill.contact = contactPhone;
-      if (tokenPayload?.name || tokenPayload?.customer_name) {
-        prefill.name = tokenPayload.name || tokenPayload.customer_name;
-      }
-      if (userEmailFromToken) prefill.email = userEmailFromToken;
 
       const options = {
         key: createJson.keyId,

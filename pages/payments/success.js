@@ -15,16 +15,17 @@ const appDetails = {
 export default function PaymentSuccess() {
   const router = useRouter();
   const hasError = router.isReady && Boolean(router.query.error);
+  const isPending = router.isReady && router.query.pending === '1';
 
   useEffect(() => {
-    if (!router.isReady || hasError) return undefined;
+    if (!router.isReady || hasError || isPending) return undefined;
 
     const timer = setTimeout(() => {
       window.location.href = appDetails.dashboardUrl;
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [router.isReady, hasError]);
+  }, [router.isReady, hasError, isPending]);
 
   const handleRedirectNow = () => {
     window.location.href = appDetails.dashboardUrl;
@@ -69,12 +70,16 @@ export default function PaymentSuccess() {
           }}>✅</div>
 
           <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
-            {hasError ? 'Payment Issue' : 'Payment Successful!'}
+            {hasError ? 'Payment Issue' : isPending ? 'Payment Pending' : 'Payment Successful!'}
           </h1>
 
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
             {hasError ? (
               <span>{router.query.error}</span>
+            ) : isPending ? (
+              <span>
+                Complete payment in your UPI app, then return to iiskills.in to check your dashboard.
+              </span>
             ) : (
               <>
                 Thank you for your payment to <strong>{appDetails.name}</strong>.
@@ -82,6 +87,7 @@ export default function PaymentSuccess() {
             )}
           </p>
 
+          {!hasError && !isPending && (
           <div style={{
             background: appDetails.cardBg,
             borderLeft: `4px solid ${appDetails.accentColor}`,
@@ -97,13 +103,17 @@ export default function PaymentSuccess() {
               Your iiskills access is being activated automatically. Redirecting to your dashboard in 3 seconds...
             </p>
           </div>
+          )}
 
+          {!hasError && !isPending && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
             <p>✅ Payment Amount: ₹116.82</p>
             <p>✅ Access Valid for {appDetails.validity}</p>
             <p>✅ No Recurring Fees</p>
           </div>
+          )}
 
+          {!hasError && !isPending && (
           <button
             onClick={handleRedirectNow}
             style={{
@@ -124,6 +134,29 @@ export default function PaymentSuccess() {
           >
             Go to Dashboard Now
           </button>
+          )}
+
+          {isPending && (
+          <a
+            href={appDetails.dashboardUrl}
+            style={{
+              display: 'inline-block',
+              width: '100%',
+              padding: '0.75rem 1rem',
+              background: `linear-gradient(135deg, ${appDetails.accentColor} 0%, #a855f7 100%)`,
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              marginBottom: '1rem',
+              textDecoration: 'none',
+            }}
+          >
+            Go to iiskills.in
+          </a>
+          )}
 
           <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
             If you have any issues, contact: support@iiskills.in
