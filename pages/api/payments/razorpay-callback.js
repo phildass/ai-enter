@@ -155,11 +155,11 @@ export default async function handler(req, res) {
     }
 
     const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });
-    let orderId = transaction?.razorpay_order_id;
+    let orderId;
 
     try {
       const payment = await razorpay.payments.fetch(razorpay_payment_id);
-      orderId = payment.order_id || orderId;
+      orderId = payment.order_id;
     } catch (err) {
       console.error('[razorpay-callback] Failed to fetch payment:', err.message);
       return paymentErrorRedirect(res, 'Unable to verify payment');
@@ -167,6 +167,11 @@ export default async function handler(req, res) {
 
     if (!orderId) {
       return paymentErrorRedirect(res, 'Missing order for payment');
+    }
+
+    if (supabase) {
+      transaction =
+        (await loadTransaction(supabase, { orderId })) || transaction;
     }
 
     const orderSignature = crypto
@@ -182,7 +187,7 @@ export default async function handler(req, res) {
         razorpay_order_id: orderId,
         razorpay_payment_id,
         razorpay_signature: orderSignature,
-        purchaseId: razorpay_payment_link_reference_id,
+        purchaseId: transaction?.session_id || razorpay_payment_link_reference_id,
       },
     });
   }

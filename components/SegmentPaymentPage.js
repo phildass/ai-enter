@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -29,6 +29,18 @@ async function readJsonResponse(res) {
 function appendFreshOrderFlag(body, needsFreshOrder) {
   if (!needsFreshOrder) return body;
   return { ...body, fresh_order: true };
+}
+
+function extractTokenPhone(tokenPayload) {
+  if (!tokenPayload) return '';
+  const raw =
+    tokenPayload.phone ||
+    tokenPayload.user_phone ||
+    tokenPayload.mobile ||
+    tokenPayload.phone_number ||
+    tokenPayload.contact;
+  const digits = String(raw || '').replace(/\D/g, '');
+  return digits.length >= 10 ? digits.slice(-10) : '';
 }
 
 function fetchWithTimeout(url, options) {
@@ -117,6 +129,16 @@ export default function SegmentPaymentPage({
   const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);
   const needsFreshOrderRef = useRef(false);
 
+  const tokenPhone = useMemo(() => extractTokenPhone(tokenPayload), [tokenPayload]);
+  const [upiPhone, setUpiPhone] = useState('');
+
+  useEffect(() => {
+    if (tokenPhone) setUpiPhone(tokenPhone);
+  }, [tokenPhone]);
+
+  const effectiveUpiPhone = upiPhone.trim();
+  const upiPhoneValid = PHONE_RE.test(effectiveUpiPhone);
+
   // Customer details (used on iiskills page)
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -155,6 +177,7 @@ export default function SegmentPaymentPage({
             : {
                 iiskills_token: rawToken,
                 purchaseId,
+                customer_phone: effectiveUpiPhone || undefined,
                 ...(course ? { course } : {}),
               };
       } else {
@@ -408,6 +431,7 @@ export default function SegmentPaymentPage({
   const disablePay =
     processing ||
     !courseAllowed ||
+    (isExternalTokenSegment && activeTokenKind === 'iiskills' && !upiPhoneValid) ||
     (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   return (
@@ -512,6 +536,36 @@ export default function SegmentPaymentPage({
               {!courseAllowed && selectedOrQueryCourse === '' && (
                 <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
                   Please select a course to continue.
+                </p>
+              )}
+            </div>
+          )}
+
+          {isExternalTokenSegment && activeTokenKind === 'iiskills' && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+                UPI mobile number *
+              </p>
+              <input
+                type="tel"
+                value={upiPhone}
+                onChange={(e) => setUpiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="10-digit number registered with GPay/UPI"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 8,
+                  border: `1px solid ${upiPhone && !upiPhoneValid ? '#f87171' : '#d1d5db'}`,
+                  fontSize: '0.95rem',
+                  color: '#374151',
+                }}
+              />
+              <p style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '0.4rem', lineHeight: 1.4 }}>
+                UPI opens in GPay/PhonePe using this number. It must match your UPI app.
+              </p>
+              {upiPhone && !upiPhoneValid && (
+                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>
+                  Enter a valid 10-digit mobile number to continue.
                 </p>
               )}
             </div>

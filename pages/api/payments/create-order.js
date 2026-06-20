@@ -6,7 +6,7 @@ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
-import { createPaymentLinkForOrder } from '../../../lib/razorpayPaymentLink';
+import { createPaymentLinkForOrder, extractCustomerPhone, normalizeIndianPhone } from '../../../lib/razorpayPaymentLink';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,8 +39,12 @@ export default async function handler(req, res) {
     }
 
     user_id = payload.user_id || null;
-    user_phone = payload.phone || payload.user_phone || null;
+    user_phone =
+      extractCustomerPhone(payload) ||
+      extractCustomerPhone({ customer_phone: req.body.customer_phone }) ||
+      null;
     customer_name = payload.name || payload.customer_name || null;
+    user_email = payload.user_email || payload.email || null;
     app_name = 'iiskills';
     course = resolveIiskillsCourseSlug(req.body.course || payload.courseSlug);
 
@@ -114,6 +118,13 @@ export default async function handler(req, res) {
       });
     }
 
+    if (app_name === 'iiskills' && !normalizeIndianPhone(user_phone)) {
+      return res.status(400).json({
+        error:
+          'A valid 10-digit mobile number is required for UPI payment. Please add your mobile number on iiskills.in and try again.',
+      });
+    }
+
     const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp(app_name);
     if (!keyId || !keySecret) {
       return res.status(500).json({
@@ -134,7 +145,10 @@ export default async function handler(req, res) {
         referenceId: session_id,
         amountPaise: orderAmountPaise,
         currency: orderRow.currency || currency || 'INR',
-        description: `${app_name} course payment`,
+        description:
+          app_name === 'iiskills'
+            ? 'IIS Skills — 1-Year Access (₹116.82 incl. GST)'
+            : `${app_name} course payment`,
         customerName: customer_name,
         customerPhone: user_phone,
         customerEmail: user_email,
