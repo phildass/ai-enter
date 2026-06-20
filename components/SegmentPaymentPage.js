@@ -498,7 +498,7 @@ export default function SegmentPaymentPage({
             <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Complete Your Payment</p>
           </div>
 
-          {allowedCourses && router.isReady && (
+{allowedCourses && router.isReady && (
   <div style={{ marginBottom: '1.5rem' }}>
     <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
       Course:
@@ -509,7 +509,7 @@ export default function SegmentPaymentPage({
       </div>
     ) : (
       <>
-        <select value={course} onChange={(e) => setSelectedCourse(e.target.value)} style={{width: '100%', padding: '0.75rem', borderRadius: 8, border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`, fontSize: '0.95rem', color: '#374151', background: 'white', cursor: 'pointer', }} >
+        <select value={course} onChange={(e) => setSelectedCourse(e.target.value)} style={{width: '100%', padding: '0.75rem', borderRadius: 8, border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`, fontSize: '0.95rem', color: '#374151', background: 'white', cursor: 'pointer' }}>
           <option value="">-- Select a course --</option>
           {allowedCourses.map((c) => (
             <option key={c} value={c}>
@@ -525,27 +525,7 @@ export default function SegmentPaymentPage({
       </>
     )}
   </div>
-
-                <div style={{ flex: 1 }}>
-                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>
-                    Last Name *
-                  </p>
-                  <input
-                    type="text"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    placeholder="Last name"
-                    style={{
-                      width: '100%',
-                      padding: '0.65rem',
-                      borderRadius: 8,
-                      border: '1px solid #d1d5db',
-                      fontSize: '0.9rem',
-                      color: '#374151',
-                    }}
-                  />
-                </div>
-              </div>
+)}
 
               <div>
                 <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>
