@@ -2,9 +2,8 @@ import React, { useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-// Razorpay Standard Checkout: confirm ONLY from the success handler (real Razorpay
-// signature) or resume-payment after the user returns from their UPI app with captured funds.
-// Never confirm on modal dismiss — that fires when opening GPay/PhonePe.
+// iiskills: redirect to Razorpay-hosted payment page (no checkout.js modal).
+// Modal UPI on mobile fires false success/cancel when opening GPay/PhonePe.
 
 function isMobileCheckout() {
   if (typeof window === 'undefined') return false;
@@ -260,6 +259,9 @@ export default function SegmentPaymentPage({
   const activeTokenKind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
   const isExternalTokenSegment =
     (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
+  const tokenPhone = extractTokenPhone(tokenPayload);
+  const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
+  const usesHostedRedirect = activeTokenKind === 'iiskills';
 
   // Main pay action
   const startPayment = async () => {
@@ -283,6 +285,7 @@ export default function SegmentPaymentPage({
                 iiskills_token: rawToken,
                 purchaseId,
                 ...(course ? { course } : {}),
+                ...(phone.trim() ? { customer_phone: phone.trim() } : {}),
               };
       } else {
         body = rawToken
@@ -337,6 +340,17 @@ export default function SegmentPaymentPage({
 
       console.log('[payment] Order created:', createJson.orderId, createJson.reused ? '(reused)' : '(new)');
       needsFreshOrderRef.current = false;
+
+      if (createJson.checkoutUrl) {
+        setStatusText('Redirecting to secure payment…');
+        window.location.href = createJson.checkoutUrl;
+        return;
+      }
+
+      if (usesHostedRedirect) {
+        throw new Error('Payment gateway did not return a checkout URL. Please try again.');
+      }
+
       setStatusText('Loading payment gateway…');
 
       try {
@@ -652,6 +666,7 @@ export default function SegmentPaymentPage({
   const disablePay =
     processing ||
     !courseAllowed ||
+    (needsPhoneInput && !PHONE_RE.test(phone.trim())) ||
     (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   return (
@@ -756,6 +771,33 @@ export default function SegmentPaymentPage({
               {!courseAllowed && selectedOrQueryCourse === '' && (
                 <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
                   Please select a course to continue.
+                </p>
+              )}
+            </div>
+          )}
+
+          {needsPhoneInput && router.isReady && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>
+                Mobile Number * (required for UPI)
+              </p>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="10-digit mobile number"
+                style={{
+                  width: '100%',
+                  padding: '0.65rem',
+                  borderRadius: 8,
+                  border: `1px solid ${phone && !PHONE_RE.test(phone) ? '#f87171' : '#d1d5db'}`,
+                  fontSize: '0.9rem',
+                  color: '#374151',
+                }}
+              />
+              {phone && !PHONE_RE.test(phone) && (
+                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
+                  Please enter a valid 10-digit phone number.
                 </p>
               )}
             </div>
