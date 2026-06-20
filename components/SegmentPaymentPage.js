@@ -65,7 +65,9 @@ export default function SegmentPaymentPage({
   const userId = tokenPayload ? userIdFromToken : router.query.user_id;
   const userEmail = tokenPayload ? userEmailFromToken : router.query.email;
 
-  const purchaseId = router.isReady ? router.query.purchaseId : undefined;
+  // purchaseId may be in the URL (?purchaseId=) or embedded in the JWT (iiskills/uriq).
+  const purchaseId =
+    (router.isReady ? router.query.purchaseId : undefined) || tokenPayload?.purchaseId;
   const courseFromQuery = router.isReady ? router.query.course : undefined;
 
   const [selectedCourse, setSelectedCourse] = useState('');
