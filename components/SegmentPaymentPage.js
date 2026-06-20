@@ -2,8 +2,39 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
-// Payment flow: create order server-side, then redirect to Razorpay-hosted payment link.
-// This avoids checkout.js modal issues on mobile UPI (GPay cancel / delay errors).
+// Razorpay Standard Checkout: confirm ONLY from the success handler (real Razorpay
+// signature) or resume-payment after the user returns from their UPI app with captured funds.
+// Never confirm on modal dismiss — that fires when opening GPay/PhonePe.
+
+function isMobileCheckout() {
+  if (typeof window === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent);
+}
+
+function loadRazorpayCheckoutScript() {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && window.Razorpay) {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Razorpay script failed')), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Razorpay script failed'));
+    document.body.appendChild(script);
+  });
+}
 
 function getApiBaseUrl() {
   // Payment API routes are on the same Next.js host as this page. Using relative
@@ -128,16 +159,81 @@ export default function SegmentPaymentPage({
   const [error, setError] = useState('');
   const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);
   const needsFreshOrderRef = useRef(false);
+  const pendingCheckoutRef = useRef(null);
+  const resumeInFlightRef = useRef(false);
+  const userLeftForUpiRef = useRef(false);
+  const checkoutOpenedAtRef = useRef(0);
 
-  const tokenPhone = useMemo(() => extractTokenPhone(tokenPayload), [tokenPayload]);
-  const [upiPhone, setUpiPhone] = useState('');
+  const tryResumePayment = async () => {
+    const pending = pendingCheckoutRef.current;
+    if (!pending || resumeInFlightRef.current) return false;
+
+    resumeInFlightRef.current = true;
+    setStatusText('Checking payment status…');
+
+    try {
+      const body = {
+        order_id: pending.orderId,
+        purchaseId: pending.purchaseId,
+        course: pending.course,
+        app_name: pending.segmentKey,
+      };
+
+      if (pending.activeTokenKind === 'uriq') {
+        body.uriq_token = pending.rawToken;
+      } else if (pending.activeTokenKind === 'iiskills') {
+        body.iiskills_token = pending.rawToken;
+      }
+
+      const res = await fetchWithTimeout(`${getApiBaseUrl()}/api/payments/resume-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await readJsonResponse(res);
+
+      if (json?.paid && json?.redirect_url) {
+        pendingCheckoutRef.current = null;
+        userLeftForUpiRef.current = false;
+        setStatusText('Redirecting…');
+        finishPaymentRedirect(json.redirect_url);
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      console.error('[payment] resume check failed:', e);
+      return false;
+    } finally {
+      resumeInFlightRef.current = false;
+    }
+  };
+
+  const tryResumePaymentRef = useRef(tryResumePayment);
+  tryResumePaymentRef.current = tryResumePayment;
 
   useEffect(() => {
-    if (tokenPhone) setUpiPhone(tokenPhone);
-  }, [tokenPhone]);
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        if (pendingCheckoutRef.current) {
+          userLeftForUpiRef.current = true;
+        }
+        return;
+      }
 
-  const effectiveUpiPhone = upiPhone.trim();
-  const upiPhoneValid = PHONE_RE.test(effectiveUpiPhone);
+      if (
+        document.visibilityState === 'visible' &&
+        userLeftForUpiRef.current &&
+        pendingCheckoutRef.current &&
+        Date.now() - checkoutOpenedAtRef.current > 3000
+      ) {
+        void tryResumePaymentRef.current();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
 
   // Customer details (used on iiskills page)
   const [firstName, setFirstName] = useState('');
@@ -177,7 +273,6 @@ export default function SegmentPaymentPage({
             : {
                 iiskills_token: rawToken,
                 purchaseId,
-                customer_phone: effectiveUpiPhone || undefined,
                 ...(course ? { course } : {}),
               };
       } else {
@@ -233,13 +328,117 @@ export default function SegmentPaymentPage({
 
       console.log('[payment] Order created:', createJson.orderId, createJson.reused ? '(reused)' : '(new)');
       needsFreshOrderRef.current = false;
+      setStatusText('Loading payment gateway…');
 
-      if (!createJson.checkoutUrl) {
-        throw new Error('Payment gateway URL missing. Please try again.');
+      try {
+        await loadRazorpayCheckoutScript();
+      } catch {
+        setError('Failed to load payment gateway. Please try again.');
+        setProcessing(false);
+        setStatusText('');
+        return;
       }
 
-      setStatusText('Redirecting to secure payment…');
-      window.location.href = createJson.checkoutUrl;
+      setStatusText('Payment window opened — complete payment to continue…');
+      userLeftForUpiRef.current = false;
+      checkoutOpenedAtRef.current = Date.now();
+
+      pendingCheckoutRef.current = {
+        orderId: createJson.orderId,
+        purchaseId,
+        course,
+        activeTokenKind,
+        rawToken,
+        segmentKey,
+      };
+
+      const prefill = {};
+      const contactPhone = extractTokenPhone(tokenPayload);
+      if (contactPhone) prefill.contact = contactPhone;
+      if (tokenPayload?.name || tokenPayload?.customer_name) {
+        prefill.name = tokenPayload.name || tokenPayload.customer_name;
+      }
+      if (userEmailFromToken) prefill.email = userEmailFromToken;
+
+      const options = {
+        key: createJson.keyId,
+        amount: createJson.amount,
+        currency: createJson.currency,
+        name: brandName,
+        description,
+        order_id: createJson.orderId,
+        retry: { enabled: false },
+        ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+
+        handler: async function (resp) {
+          try {
+            if (
+              !resp?.razorpay_order_id ||
+              !resp?.razorpay_payment_id ||
+              !resp?.razorpay_signature
+            ) {
+              setError('Payment did not complete. Please try again.');
+              setProcessing(false);
+              setStatusText('');
+              return;
+            }
+
+            pendingCheckoutRef.current = null;
+            userLeftForUpiRef.current = false;
+            setStatusText('Verifying payment…');
+
+            await verifyPayment({
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              orderData: createJson,
+            });
+          } catch (e) {
+            setError(e?.message || 'Payment verification failed. Please try again.');
+            setProcessing(false);
+            setStatusText('');
+          }
+        },
+
+        modal: {
+          confirm_close: true,
+          escape: false,
+          backdropclose: false,
+          ondismiss: function () {
+            if (isMobileCheckout() && pendingCheckoutRef.current) {
+              setStatusText('Complete payment in your UPI app, then return to this page.');
+              setProcessing(false);
+              return;
+            }
+            pendingCheckoutRef.current = null;
+            userLeftForUpiRef.current = false;
+            setError('Payment cancelled. No money was debited.');
+            setProcessing(false);
+            setStatusText('');
+          },
+        },
+
+        theme: { color: accentColor },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on('payment.failed', function (resp) {
+        needsFreshOrderRef.current = true;
+        pendingCheckoutRef.current = null;
+        userLeftForUpiRef.current = false;
+
+        const msg =
+          resp?.error?.description ||
+          resp?.error?.reason ||
+          'Payment failed. Tap Pay again to retry.';
+
+        setError(msg);
+        setProcessing(false);
+        setStatusText('');
+      });
+
+      rzp.open();
       return;
     } catch (e) {
       console.error('[payment] Unexpected error:', e);
@@ -431,7 +630,6 @@ export default function SegmentPaymentPage({
   const disablePay =
     processing ||
     !courseAllowed ||
-    (isExternalTokenSegment && activeTokenKind === 'iiskills' && !upiPhoneValid) ||
     (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   return (
@@ -536,37 +734,6 @@ export default function SegmentPaymentPage({
               {!courseAllowed && selectedOrQueryCourse === '' && (
                 <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
                   Please select a course to continue.
-                </p>
-              )}
-            </div>
-          )}
-
-          {isExternalTokenSegment && activeTokenKind === 'iiskills' && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-                UPI payment mobile number *
-              </p>
-              <input
-                type="tel"
-                value={upiPhone}
-                onChange={(e) => setUpiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="10-digit number linked to your paying UPI app"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 8,
-                  border: `1px solid ${upiPhone && !upiPhoneValid ? '#f87171' : '#d1d5db'}`,
-                  fontSize: '0.95rem',
-                  color: '#374151',
-                }}
-              />
-              <p style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '0.4rem', lineHeight: 1.4 }}>
-                Use the number linked to the UPI app you will pay with. It does not need to match your
-                iiskills account number.
-              </p>
-              {upiPhone && !upiPhoneValid && (
-                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>
-                  Enter a valid 10-digit mobile number to continue.
                 </p>
               )}
             </div>

@@ -83,11 +83,26 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: false, paid: false, pending: true });
   }
 
-  const captured =
-    payments?.items?.find((p) => p.status === 'captured') ||
-    payments?.items?.find((p) => p.status === 'authorized');
+  // Only confirm after Razorpay reports captured funds — never on authorized/pending.
+  const captured = payments?.items?.find((p) => p.status === 'captured');
 
   if (!captured?.id) {
+    return res.status(200).json({ success: false, paid: false, pending: true });
+  }
+
+  let orderAmountPaise;
+  try {
+    const order = await razorpay.orders.fetch(order_id);
+    orderAmountPaise = order.amount;
+  } catch (err) {
+    console.error('[resume-payment] order fetch failed:', err.message);
+    return res.status(200).json({ success: false, paid: false, pending: true });
+  }
+
+  if (orderAmountPaise && captured.amount !== orderAmountPaise) {
+    console.error(
+      `[resume-payment] amount mismatch order=${orderAmountPaise} payment=${captured.amount}`,
+    );
     return res.status(200).json({ success: false, paid: false, pending: true });
   }
 

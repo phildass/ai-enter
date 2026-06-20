@@ -6,12 +6,7 @@ import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
 import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
-import {
-  createPaymentLinkForOrder,
-  extractCustomerPhone,
-  formatRazorpayError,
-  normalizeIndianPhone,
-} from '../../../lib/razorpayPaymentLink';
+import { extractCustomerPhone } from '../../../lib/razorpayPaymentLink';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,10 +27,8 @@ export default async function handler(req, res) {
     course;
 
   if (req.body.iiskills_token) {
-    // New iiskills JWT flow: token issued by iiskills, verified with IISKILLS_PAYMENT_TOKEN_SECRET
     let payload;
     try {
-      // IMPORTANT: token may omit purchaseId; accept it from request body (from query string)
       payload = verifyIiskillsToken(req.body.iiskills_token, {
         expectedPurchaseId: req.body.purchaseId,
       });
@@ -61,12 +54,9 @@ export default async function handler(req, res) {
     currency = payload.currency || 'INR';
     validity_days = payload.validity_days || 365;
     return_url = payload.return_to || payload.return_url || null;
-
-    // For iiskills, session_id == purchaseId
     session_id = payload.purchaseId;
     handoff_token = req.body.iiskills_token;
   } else if (req.body.session_token) {
-    // Token-based flow (jai-bharat, jai-kisan, iisacademy)
     let payload;
     try {
       payload = verifyHandoffToken(req.body.session_token);
@@ -85,7 +75,6 @@ export default async function handler(req, res) {
     validity_days = payload.validity_days;
     return_url = payload.return_url;
 
-    // course passed alongside token (course selected on the payment page)
     if (req.body.course !== undefined) {
       course = req.body.course;
       if (course && typeof course !== 'string') {
@@ -98,7 +87,6 @@ export default async function handler(req, res) {
       }
     }
   } else {
-    // Legacy flow (direct API callers)
     ({ user_id, app_name, user_email, user_phone, customer_name, course } = req.body);
     if (course && typeof course !== 'string') {
       return res.status(400).json({ error: 'Invalid course value' });
@@ -110,7 +98,6 @@ export default async function handler(req, res) {
     }
   }
 
-  // Supabase (optional but enables idempotency + "already paid" protection)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabase =
@@ -120,13 +107,6 @@ export default async function handler(req, res) {
     if (!isSupportedPaymentApp(app_name)) {
       return res.status(400).json({
         error: 'Unsupported payment app. Only iiskills and uriq.in are allowed.',
-      });
-    }
-
-    if (app_name === 'iiskills' && !normalizeIndianPhone(user_phone)) {
-      return res.status(400).json({
-        error:
-          'Enter the 10-digit mobile number of the UPI app you will pay with (GPay, PhonePe, etc.).',
       });
     }
 
@@ -143,39 +123,7 @@ export default async function handler(req, res) {
     });
 
     const freshOrder = Boolean(req.body.fresh_order);
-    const finalAmountPaise = amount_paise || 11682;
-    const finalCurrency = currency || 'INR';
-    const paymentDescription =
-      app_name === 'iiskills'
-        ? 'IIS Skills — 1-Year Access (₹116.82 incl. GST)'
-        : `${app_name} course payment`;
 
-    async function buildCheckoutPayload() {
-      const link = await createPaymentLinkForOrder(razorpay, {
-        referenceId: session_id,
-        amountPaise: finalAmountPaise,
-        currency: finalCurrency,
-        description: paymentDescription,
-        customerName: customer_name,
-        customerPhone: user_phone,
-        customerEmail: user_email,
-        appName: app_name,
-      });
-
-      return {
-        orderId: link.orderId,
-        amount: finalAmountPaise,
-        currency: finalCurrency,
-        keyId: publicKey,
-        session_id,
-        return_url: return_url || null,
-        checkoutUrl: link.checkoutUrl,
-        paymentLinkId: link.paymentLinkId,
-      };
-    }
-
-    // --- Idempotency / reuse protection (requires Supabase configured) ---
-    let existingRow = null;
     if (supabase && app_name && session_id) {
       const { data: existing, error: existingErr } = await supabase
         .from('payment_transactions')
@@ -188,47 +136,97 @@ export default async function handler(req, res) {
       if (existingErr) {
         console.error('[create-order] Supabase lookup failed (non-fatal):', existingErr.message);
       } else if (existing?.length > 0) {
-        existingRow = existing[0];
+        const row = existing[0];
 
-        if (existingRow.status === 'success' || existingRow.status === 'paid') {
+        if (row.status === 'success' || row.status === 'paid') {
           return res.status(409).json({
             error: 'This payment link has already been used. Please start a new purchase.',
           });
         }
 
-        if (existingRow.razorpay_order_id && existingRow.status === 'pending' && !freshOrder) {
+        if (row.status === 'failed' || freshOrder) {
+          // create a new Razorpay order below
+        } else if (row.status === 'pending' && row.razorpay_order_id) {
           try {
-            const existingOrder = await razorpay.orders.fetch(existingRow.razorpay_order_id);
+            const existingOrder = await razorpay.orders.fetch(row.razorpay_order_id);
+
             if (existingOrder.status === 'paid') {
               await supabase
                 .from('payment_transactions')
                 .update({ status: 'success', updated_at: new Date().toISOString() })
-                .eq('id', existingRow.id);
+                .eq('id', row.id);
               return res.status(409).json({
                 error: 'This payment link has already been used. Please start a new purchase.',
               });
             }
+
+            if (existingOrder.status === 'created') {
+              if (handoff_token) {
+                await supabase
+                  .from('payment_transactions')
+                  .update({ handoff_token, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+              return res.status(200).json({
+                orderId: existingOrder.id,
+                amount: existingOrder.amount,
+                currency: existingOrder.currency || currency || 'INR',
+                keyId: publicKey,
+                session_id,
+                return_url: row.return_url || return_url || null,
+                reused: true,
+              });
+            }
+
+            console.log(
+              `[create-order] Replacing attempted Razorpay order ${row.razorpay_order_id} for session ${session_id}`,
+            );
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', row.id);
           } catch (fetchErr) {
             console.error(
-              '[create-order] Failed to fetch existing Razorpay order (creating fresh link):',
+              '[create-order] Failed to fetch existing Razorpay order (creating fresh):',
               fetchErr.message,
             );
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', row.id);
           }
         }
       }
     }
 
-    const payload = await buildCheckoutPayload();
+    const finalAmountPaise = amount_paise || 11682;
+    const finalCurrency = currency || 'INR';
+    const receiptSuffix = Date.now().toString(36);
+
+    const order = await razorpay.orders.create({
+      amount: finalAmountPaise,
+      currency: finalCurrency,
+      receipt: `${app_name}_${session_id || 'anon'}_${receiptSuffix}`.slice(0, 40),
+      notes: {
+        user_id,
+        app_name,
+        session_id,
+        user_email: user_email || '',
+        user_phone: user_phone || '',
+        customer_name: customer_name || '',
+        course: course || undefined,
+      },
+    });
 
     if (supabase) {
-      const rowData = {
+      const { error } = await supabase.from('payment_transactions').insert({
         user_id: user_id || null,
         user_email: user_email || null,
         user_phone: user_phone || null,
         customer_name: customer_name || null,
         app_name,
         session_id,
-        razorpay_order_id: payload.orderId,
+        razorpay_order_id: order.id,
         amount: finalAmountPaise / 100,
         currency: finalCurrency,
         validity_days: validity_days || 30,
@@ -236,42 +234,27 @@ export default async function handler(req, res) {
         course: course || null,
         handoff_token: handoff_token || null,
         status: 'pending',
-        updated_at: new Date().toISOString(),
-      };
+      });
 
-      if (existingRow && existingRow.status !== 'success' && existingRow.status !== 'paid') {
-        const { error } = await supabase
-          .from('payment_transactions')
-          .update(rowData)
-          .eq('id', existingRow.id);
-
-        if (error) {
-          console.error('[create-order] Supabase update failed (non-fatal):', error.message);
-        }
-      } else {
-        const { error } = await supabase.from('payment_transactions').insert(rowData);
-
-        if (error) {
-          console.error(
-            '[create-order] Supabase insert into payment_transactions failed (non-fatal):',
-            error.message,
-          );
-        }
+      if (error) {
+        console.error(
+          '[create-order] Supabase insert into payment_transactions failed (non-fatal):',
+          error.message,
+        );
       }
     }
 
     return res.status(200).json({
-      ...payload,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: publicKey,
+      session_id,
+      return_url: return_url || null,
       reused: false,
     });
   } catch (error) {
     console.error('Order creation error:', error);
-    const message = formatRazorpayError(error);
-    const status =
-      error.message?.includes('required for UPI') ||
-      error.message?.includes('Valid 10-digit')
-        ? 400
-        : 502;
-    return res.status(status).json({ error: message });
+    return res.status(500).json({ error: 'Unable to process payment. Please try again.' });
   }
 }

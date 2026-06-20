@@ -182,6 +182,19 @@ export default async function handler(req, res) {
       return paymentErrorRedirect(res, 'Missing order for payment');
     }
 
+    try {
+      const payment = await razorpay.payments.fetch(razorpay_payment_id);
+      if (payment.status !== 'captured') {
+        return paymentErrorRedirect(res, 'Payment was not completed');
+      }
+      if (payment.order_id && payment.order_id !== orderId) {
+        return paymentErrorRedirect(res, 'Payment does not match this order');
+      }
+    } catch (err) {
+      console.error('[razorpay-callback] payment verify failed:', err.message);
+      return paymentErrorRedirect(res, 'Unable to verify payment');
+    }
+
     if (supabase) {
       transaction =
         (await loadTransaction(supabase, { orderId })) || transaction;

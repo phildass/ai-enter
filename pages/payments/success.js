@@ -14,15 +14,17 @@ const appDetails = {
 
 export default function PaymentSuccess() {
   const router = useRouter();
+  const hasError = router.isReady && Boolean(router.query.error);
 
   useEffect(() => {
-    // Auto-redirect to iiskills dashboard after 3 seconds
+    if (!router.isReady || hasError) return undefined;
+
     const timer = setTimeout(() => {
       window.location.href = appDetails.dashboardUrl;
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [router.isReady, hasError]);
 
   const handleRedirectNow = () => {
     window.location.href = appDetails.dashboardUrl;
@@ -67,11 +69,17 @@ export default function PaymentSuccess() {
           }}>✅</div>
 
           <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
-            Payment Successful!
+            {hasError ? 'Payment Issue' : 'Payment Successful!'}
           </h1>
 
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
-            Thank you for your payment to <strong>{appDetails.name}</strong>.
+            {hasError ? (
+              <span>{router.query.error}</span>
+            ) : (
+              <>
+                Thank you for your payment to <strong>{appDetails.name}</strong>.
+              </>
+            )}
           </p>
 
           <div style={{
