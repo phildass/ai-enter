@@ -4,7 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
 import { getRazorpayCredentialsForApp } from '../../../lib/payments';
 import { verifyPaymentLinkCallbackSignature } from '../../../lib/razorpayPaymentLink';
-import { assertPaymentCaptured } from '../../../lib/razorpayCapture';
+import {
+  assertPaymentCaptured,
+  checkoutCooldownRemainingMs,
+  isWithinCheckoutCooldown,
+} from '../../../lib/razorpayCapture';
 
 const DEFAULT_REDIRECTS = {
   iiskills: 'https://iiskills.in/dashboard',
@@ -12,7 +16,7 @@ const DEFAULT_REDIRECTS = {
 };
 
 const TX_SELECT =
-  'app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id, razorpay_payment_id';
+  'app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id, razorpay_payment_id, created_at, updated_at';
 
 function redirect(res, url) {
   res.setHeader('Cache-Control', 'no-store');
@@ -32,6 +36,32 @@ function paymentPendingRedirect(res, appName) {
     res,
     `/payments/success?pending=1&app=${encodeURIComponent(appName || 'iiskills')}`,
   );
+}
+
+/**
+ * HTTP 200 — do not redirect or grant entitlements while UPI is still in progress.
+ * A 303 to an error/success page during authorized/pending can abort the UPI session.
+ */
+function respondWaiting(res, { reason, paymentStatus, appName }) {
+  console.log('[razorpay-callback] waiting 200 (no entitlement, no cancel)', {
+    reason,
+    paymentStatus: paymentStatus || null,
+    appName,
+  });
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.statusCode = 200;
+  const portal = DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
+  const statusLine = paymentStatus ? `Payment status: ${paymentStatus}` : reason || 'Waiting for UPI';
+  res.end(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment in progress</title></head>
+<body style="font-family:system-ui,sans-serif;max-width:420px;margin:2rem auto;padding:0 1rem;text-align:center">
+<h1 style="font-size:1.35rem">Complete payment in your UPI app</h1>
+<p style="color:#374151;line-height:1.5">Your payment is not finished yet. Open your UPI app, confirm the amount, and enter your PIN.</p>
+<p style="color:#6b7280;font-size:0.9rem">${statusLine}</p>
+<p style="margin-top:1.5rem"><a href="${portal}" style="color:#4f46e5">Go to dashboard after paying</a></p>
+</body></html>`);
 }
 
 async function loadTransaction(supabase, { orderId, referenceId }) {
@@ -88,6 +118,23 @@ function buildOrderSignature(orderId, paymentId, keySecret) {
   return crypto.createHmac('sha256', keySecret).update(`${orderId}|${paymentId}`).digest('hex');
 }
 
+function logCallbackCooldown(transaction, orderId, paymentId, source) {
+  console.log(
+    `[razorpay-callback] cooldown waiting (${source}): order=${orderId} payment=${paymentId || 'n/a'} remainingMs=${checkoutCooldownRemainingMs(transaction)}`,
+  );
+}
+
+function enforceCheckoutCooldown(res, transaction, appName, orderId, paymentId, source) {
+  if (!isWithinCheckoutCooldown(transaction)) return false;
+  logCallbackCooldown(transaction, orderId, paymentId, source);
+  respondWaiting(res, {
+    reason: `Checkout cooldown (${source})`,
+    paymentStatus: 'pending',
+    appName,
+  });
+  return true;
+}
+
 async function finalizeAndRedirect(res, { transaction, appName, paymentParams }) {
   const incomingPaymentId = paymentParams.razorpay_payment_id;
 
@@ -101,7 +148,11 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
       console.warn(
         `[razorpay-callback] success tx payment mismatch stored=${transaction.razorpay_payment_id} incoming=${incomingPaymentId}`,
       );
-      return paymentPendingRedirect(res, appName);
+      return respondWaiting(res, {
+        reason: 'Payment ID mismatch on completed transaction',
+        paymentStatus: 'pending',
+        appName,
+      });
     }
 
     const doneUrl =
@@ -130,7 +181,11 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
 
   if (!result.ok) {
     if (result.error?.includes('not captured') || result.error?.includes('not captured yet')) {
-      return paymentPendingRedirect(res, appName);
+      return respondWaiting(res, {
+        reason: 'Payment not captured yet',
+        paymentStatus: 'pending',
+        appName,
+      });
     }
     return paymentErrorRedirect(res, result.error || 'Payment verification failed');
   }
@@ -172,6 +227,19 @@ async function handleStandardCheckoutCallback(
     return paymentErrorRedirect(res, 'Payment system not configured');
   }
 
+  if (
+    enforceCheckoutCooldown(
+      res,
+      transaction,
+      appName,
+      razorpay_order_id,
+      razorpay_payment_id,
+      'standard',
+    )
+  ) {
+    return;
+  }
+
   if (!verifyOrderSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature, keySecret)) {
     console.error('[razorpay-callback] Invalid standard checkout signature');
     return paymentErrorRedirect(res, 'Invalid payment signature');
@@ -192,7 +260,11 @@ async function handleStandardCheckoutCallback(
       `[razorpay-callback] blocked non-captured payment: id=${razorpay_payment_id} status=${captureCheck.payment?.status}`,
     );
     if (captureCheck.pending) {
-      return paymentPendingRedirect(res, appName);
+      return respondWaiting(res, {
+        reason: 'Awaiting UPI capture',
+        paymentStatus: captureCheck.payment?.status,
+        appName,
+      });
     }
     return paymentErrorRedirect(res, captureCheck.error);
   }
@@ -216,6 +288,28 @@ async function handleStandardCheckoutCallback(
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
+  console.log(
+    '[razorpay-callback] payload',
+    JSON.stringify({
+      ts: new Date().toISOString(),
+      method: req.method,
+      query: req.query || {},
+      body: req.body || {},
+    }),
+  );
+
+  const orderId = req.query?.razorpay_order_id || req.body?.razorpay_order_id;
+  const paymentId = req.query?.razorpay_payment_id || req.body?.razorpay_payment_id;
+
+  console.log('[razorpay-callback] hit', {
+    ts: new Date().toISOString(),
+    method: req.method,
+    order_id: orderId || null,
+    payment_id: paymentId || null,
+    payment_link_id: req.query?.razorpay_payment_link_id || null,
+    payment_link_status: req.query?.razorpay_payment_link_status || null,
+  });
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabase =
@@ -235,7 +329,11 @@ export default async function handler(req, res) {
       console.log(
         `[razorpay-callback] payment link not paid: status=${razorpay_payment_link_status}`,
       );
-      return paymentPendingRedirect(res, 'iiskills');
+      return respondWaiting(res, {
+        reason: 'Payment link not paid yet',
+        paymentStatus: razorpay_payment_link_status,
+        appName: 'iiskills',
+      });
     }
 
     if (
@@ -258,6 +356,19 @@ export default async function handler(req, res) {
     const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
     if (!keySecret) {
       return paymentErrorRedirect(res, 'Payment system not configured');
+    }
+
+    if (
+      enforceCheckoutCooldown(
+        res,
+        transaction,
+        appName,
+        null,
+        razorpay_payment_id,
+        'payment_link',
+      )
+    ) {
+      return;
     }
 
     if (
@@ -288,7 +399,11 @@ export default async function handler(req, res) {
 
     if (paymentLink.status !== 'paid') {
       console.log(`[razorpay-callback] API payment link status=${paymentLink.status}`);
-      return paymentPendingRedirect(res, appName);
+      return respondWaiting(res, {
+        reason: 'Payment link not paid yet',
+        paymentStatus: paymentLink.status,
+        appName,
+      });
     }
 
     let captureCheck;
@@ -304,7 +419,11 @@ export default async function handler(req, res) {
         `[razorpay-callback] blocked non-captured payment link payment: status=${captureCheck.payment?.status}`,
       );
       if (captureCheck.pending) {
-        return paymentPendingRedirect(res, appName);
+        return respondWaiting(res, {
+          reason: 'Awaiting UPI capture',
+          paymentStatus: captureCheck.payment?.status,
+          appName,
+        });
       }
       return paymentErrorRedirect(res, captureCheck.error);
     }

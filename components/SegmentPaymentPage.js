@@ -205,6 +205,7 @@ export default function SegmentPaymentPage({
     allowedCourses.includes(selectedOrQueryCourse);
 
   const [processing, setProcessing] = useState(false);
+  const [isInitiating, setIsInitiating] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
   const [awaitingUpiReturn, setAwaitingUpiReturn] = useState(false);
@@ -213,6 +214,41 @@ export default function SegmentPaymentPage({
   const pendingCheckoutRef = useRef(null);
   const resumeInFlightRef = useRef(false);
   const paymentInFlightRef = useRef(false);
+  const razorpayOpenedRef = useRef(false);
+  const payButtonRef = useRef(null);
+
+  const lockPayButton = () => {
+    if (paymentInFlightRef.current || isInitiating) return false;
+    paymentInFlightRef.current = true;
+    setIsInitiating(true);
+    if (payButtonRef.current) {
+      payButtonRef.current.disabled = true;
+    }
+    return true;
+  };
+
+  const unlockPayButton = () => {
+    paymentInFlightRef.current = false;
+    razorpayOpenedRef.current = false;
+    setIsInitiating(false);
+  };
+
+  const openRazorpayOnce = (options) => {
+    if (razorpayOpenedRef.current) {
+      console.warn('[payment] blocked duplicate Razorpay.open()', {
+        order_id: options?.order_id,
+      });
+      return null;
+    }
+    razorpayOpenedRef.current = true;
+    console.log('[payment] Razorpay.open', {
+      ts: new Date().toISOString(),
+      order_id: options?.order_id,
+    });
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+    return rzp;
+  };
 
   const tryResumePayment = async () => {
     const pending = pendingCheckoutRef.current;
@@ -295,13 +331,21 @@ export default function SegmentPaymentPage({
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
   const usesRedirectCheckout = isExternalTokenSegment;
 
-  // Main pay action — guarded so create-order cannot fire twice per interaction.
-  const startPayment = async () => {
-    if (paymentInFlightRef.current || processing) {
-      console.log('[payment] Ignoring duplicate Pay tap');
+  // Main pay action — atomic lock prevents duplicate create-order / double UPI intent.
+  const handlePay = async () => {
+    console.log('[payment] handlePay start', {
+      ts: new Date().toISOString(),
+      segmentKey,
+      purchaseId: purchaseId || null,
+      inFlight: paymentInFlightRef.current,
+      isInitiating,
+      processing,
+    });
+
+    if (!lockPayButton()) {
+      console.log('[payment] handlePay blocked — pay lock already held');
       return;
     }
-    paymentInFlightRef.current = true;
 
     setProcessing(true);
     setStatusText('Creating order…');
@@ -372,7 +416,7 @@ export default function SegmentPaymentPage({
           setError(createJson?.error || 'This payment link has already been used. Please start a new purchase.');
           setProcessing(false);
           setStatusText('');
-          paymentInFlightRef.current = false;
+          unlockPayButton();
           return;
         }
         throw new Error(createJson?.error || 'Payment could not be initiated. Please try again.');
@@ -389,7 +433,7 @@ export default function SegmentPaymentPage({
         setError('Failed to load payment gateway. Please try again.');
         setProcessing(false);
         setStatusText('');
-        paymentInFlightRef.current = false;
+        unlockPayButton();
         return;
       }
 
@@ -415,6 +459,7 @@ export default function SegmentPaymentPage({
           activeTokenKind,
           rawToken: rawToken || null,
           returnUrl: createJson.return_url || null,
+          checkoutStartedAt: Date.now(),
         });
 
         if (!persisted) {
@@ -435,8 +480,10 @@ export default function SegmentPaymentPage({
           theme: { color: accentColor },
         };
 
-        const rzp = new window.Razorpay(options);
-        rzp.open();
+        const rzp = openRazorpayOnce(options);
+        if (!rzp) {
+          throw new Error('Payment window is already open. Please complete or cancel it first.');
+        }
         leavingForCheckout = true;
         return;
       }
@@ -462,6 +509,7 @@ export default function SegmentPaymentPage({
         activeTokenKind,
         rawToken: rawToken || null,
         returnUrl: createJson.return_url || null,
+        checkoutStartedAt: Date.now(),
       });
 
       const options = {
@@ -514,7 +562,7 @@ export default function SegmentPaymentPage({
           escape: false,
           backdropclose: false,
           ondismiss: function () {
-            paymentInFlightRef.current = false;
+            unlockPayButton();
             if (pendingCheckoutRef.current) {
               setAwaitingUpiReturn(true);
               setError('');
@@ -532,7 +580,10 @@ export default function SegmentPaymentPage({
         theme: { color: accentColor },
       };
 
-      const rzp = new window.Razorpay(options);
+      const rzp = openRazorpayOnce(options);
+      if (!rzp) {
+        throw new Error('Payment window is already open. Please complete or cancel it first.');
+      }
 
       rzp.on('payment.failed', function (resp) {
         if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
@@ -543,7 +594,7 @@ export default function SegmentPaymentPage({
           return;
         }
 
-        paymentInFlightRef.current = false;
+        unlockPayButton();
         needsFreshOrderRef.current = true;
         pendingCheckoutRef.current = null;
         clearCheckoutSession();
@@ -559,7 +610,6 @@ export default function SegmentPaymentPage({
         setStatusText('');
       });
 
-      rzp.open();
       if (mobileCheckout) {
         leavingForCheckout = true;
       }
@@ -571,7 +621,7 @@ export default function SegmentPaymentPage({
       setStatusText('');
     } finally {
       if (!leavingForCheckout) {
-        paymentInFlightRef.current = false;
+        unlockPayButton();
       }
     }
   };
@@ -757,6 +807,7 @@ export default function SegmentPaymentPage({
 
   // Basic page shell (kept consistent with your existing UI approach)
   const disablePay =
+    isInitiating ||
     processing ||
     !courseAllowed ||
     (needsPhoneInput && !PHONE_RE.test(phone.trim())) ||
@@ -1015,8 +1066,12 @@ export default function SegmentPaymentPage({
           </div>
 
           <button
-            onClick={startPayment}
+            ref={payButtonRef}
+            type="button"
+            onClick={handlePay}
             disabled={disablePay}
+            aria-busy={isInitiating || processing}
+            aria-disabled={disablePay}
             style={{
               width: '100%',
               padding: '1rem',
@@ -1027,11 +1082,12 @@ export default function SegmentPaymentPage({
               fontSize: '1.05rem',
               fontWeight: 700,
               cursor: disablePay ? 'not-allowed' : 'pointer',
+              pointerEvents: disablePay ? 'none' : 'auto',
               transition: '0.2s',
               marginBottom: '0.75rem',
             }}
           >
-            {processing ? statusText || 'Processing…' : `Pay ${displayPrice || '₹116.82'}`}
+            {isInitiating || processing ? statusText || 'Processing…' : `Pay ${displayPrice || '₹116.82'}`}
           </button>
 
           {awaitingUpiReturn && pendingCheckoutRef.current && (

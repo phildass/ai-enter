@@ -5,7 +5,9 @@ import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
 import { getRazorpayCredentialsForApp } from '../../../lib/payments';
 import {
   assertPaymentCaptured,
+  checkoutCooldownRemainingMs,
   isEntitlementWebhookEvent,
+  isWithinCheckoutCooldown,
 } from '../../../lib/razorpayCapture';
 
 export const config = {
@@ -73,7 +75,16 @@ export default async function handler(req, res) {
   }
 
   const eventType = event?.event ?? 'unknown';
-  console.log('[razorpay-webhook] Received event:', eventType);
+  const paymentEntity = event?.payload?.payment?.entity;
+  const webhookOrderId = paymentEntity?.order_id;
+  const webhookPaymentId = paymentEntity?.id;
+
+  console.log('[razorpay-webhook] hit', {
+    ts: new Date().toISOString(),
+    event: eventType,
+    order_id: webhookOrderId || null,
+    payment_id: webhookPaymentId || null,
+  });
 
   if (!isEntitlementWebhookEvent(eventType)) {
     if (eventType === 'payment.authorized') {
@@ -82,9 +93,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ received: true, action: 'ignored', event: eventType });
   }
 
-  const paymentEntity = event?.payload?.payment?.entity;
-  const razorpay_order_id = paymentEntity?.order_id;
-  const razorpay_payment_id = paymentEntity?.id;
+  const razorpay_order_id = webhookOrderId;
+  const razorpay_payment_id = webhookPaymentId;
 
   if (!razorpay_order_id || !razorpay_payment_id) {
     console.error('[razorpay-webhook] payment.captured missing order_id or payment id');
@@ -100,7 +110,9 @@ export default async function handler(req, res) {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const { data: transaction } = await supabase
     .from('payment_transactions')
-    .select('app_name, session_id, course, handoff_token, status, razorpay_payment_id')
+    .select(
+      'app_name, session_id, course, handoff_token, status, razorpay_payment_id, created_at, updated_at',
+    )
     .eq('razorpay_order_id', razorpay_order_id)
     .maybeSingle();
 
@@ -117,6 +129,13 @@ export default async function handler(req, res) {
     transaction.razorpay_payment_id === razorpay_payment_id
   ) {
     return res.status(200).json({ received: true, action: 'already_processed' });
+  }
+
+  if (isWithinCheckoutCooldown(transaction)) {
+    console.log(
+      `[razorpay-webhook] cooldown waiting: order=${razorpay_order_id} payment=${razorpay_payment_id} remainingMs=${checkoutCooldownRemainingMs(transaction)}`,
+    );
+    return res.status(200).json({ received: true, action: 'cooldown', event: eventType });
   }
 
   const razorpay = new Razorpay({ key_id: keyId, key_secret: keySecret });

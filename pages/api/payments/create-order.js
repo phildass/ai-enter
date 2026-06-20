@@ -110,6 +110,13 @@ export default async function handler(req, res) {
       });
     }
 
+    console.log('[create-order] request received', {
+      ts: new Date().toISOString(),
+      app_name,
+      session_id: session_id || null,
+      fresh_order: Boolean(req.body.fresh_order),
+    });
+
     const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp(app_name);
     if (!keyId || !keySecret) {
       return res.status(500).json({
@@ -161,12 +168,20 @@ export default async function handler(req, res) {
             }
 
             if (existingOrder.status === 'created') {
-              if (handoff_token) {
-                await supabase
-                  .from('payment_transactions')
-                  .update({ handoff_token, updated_at: new Date().toISOString() })
-                  .eq('id', row.id);
-              }
+              const reuseUpdate = {
+                updated_at: new Date().toISOString(),
+                ...(handoff_token ? { handoff_token } : {}),
+              };
+              await supabase
+                .from('payment_transactions')
+                .update(reuseUpdate)
+                .eq('id', row.id);
+
+              console.log('[create-order] reusing pending order', {
+                orderId: existingOrder.id,
+                session_id,
+              });
+
               return res.status(200).json({
                 orderId: existingOrder.id,
                 amount: existingOrder.amount,
