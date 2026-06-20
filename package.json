@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p 3040",
+    "start": "node scripts/start-server.js",
     "test": "node __tests__/iiskills.test.js"
   },
   "repository": {
@@ -20,6 +20,9 @@
     "url": "https://github.com/phildass/ai-enter/issues"
   },
   "homepage": "https://github.com/phildass/ai-enter#readme",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
     "next": "^15.0.8",

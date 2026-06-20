@@ -10,7 +10,7 @@ module.exports = {
       watch: false,
       max_memory_restart: "2G",
       min_uptime: "10s",
-      max_restarts: 5,
+      max_restarts: 20,
       restart_delay: 4000,
       error_file: "/var/www/ai-enter/logs/aienter-error.log",
       out_file: "/var/www/ai-enter/logs/aienter-out.log",

@@ -12,5 +12,7 @@ elif [ -f /var/www/ai-enter/.env ]; then
 fi
 set +a
 
+export PORT="${PORT:-3040}"
+
 cd /var/www/ai-enter
 exec npm start
