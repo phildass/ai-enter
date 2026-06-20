@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -8,7 +8,28 @@ import { useRouter } from 'next/router';
 
 function isMobileCheckout() {
   if (typeof window === 'undefined') return false;
-  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent);
+  const uaMatch = /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile|webOS|BlackBerry/i.test(
+    navigator.userAgent,
+  );
+  const touchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const narrow = window.innerWidth <= 768;
+  return uaMatch || (touchDevice && narrow);
+}
+
+function isLikelyUpiTransitionFailure(resp) {
+  const text = [
+    resp?.error?.description,
+    resp?.error?.reason,
+    resp?.error?.code,
+    resp?.error?.metadata?.payment_reason,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return (
+    !text ||
+    /upi|cancel|dismiss|intent|timeout|delay|closed|user|another|progress|pending/.test(text)
+  );
 }
 
 function loadRazorpayCheckoutScript() {
@@ -157,12 +178,11 @@ export default function SegmentPaymentPage({
   const [processing, setProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
+  const [awaitingUpiReturn, setAwaitingUpiReturn] = useState(false);
   const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);
   const needsFreshOrderRef = useRef(false);
   const pendingCheckoutRef = useRef(null);
   const resumeInFlightRef = useRef(false);
-  const userLeftForUpiRef = useRef(false);
-  const checkoutOpenedAtRef = useRef(0);
 
   const tryResumePayment = async () => {
     const pending = pendingCheckoutRef.current;
@@ -194,12 +214,13 @@ export default function SegmentPaymentPage({
 
       if (json?.paid && json?.redirect_url) {
         pendingCheckoutRef.current = null;
-        userLeftForUpiRef.current = false;
+        setAwaitingUpiReturn(false);
         setStatusText('Redirecting…');
         finishPaymentRedirect(json.redirect_url);
         return true;
       }
 
+      setStatusText('');
       return false;
     } catch (e) {
       console.error('[payment] resume check failed:', e);
@@ -209,31 +230,18 @@ export default function SegmentPaymentPage({
     }
   };
 
-  const tryResumePaymentRef = useRef(tryResumePayment);
-  tryResumePaymentRef.current = tryResumePayment;
-
-  useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        if (pendingCheckoutRef.current) {
-          userLeftForUpiRef.current = true;
-        }
-        return;
-      }
-
-      if (
-        document.visibilityState === 'visible' &&
-        userLeftForUpiRef.current &&
-        pendingCheckoutRef.current &&
-        Date.now() - checkoutOpenedAtRef.current > 3000
-      ) {
-        void tryResumePaymentRef.current();
-      }
-    };
-
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
+  const checkPaymentStatus = async () => {
+    if (!pendingCheckoutRef.current || resumeInFlightRef.current) return;
+    setProcessing(true);
+    setError('');
+    setStatusText('Checking payment status…');
+    const ok = await tryResumePayment();
+    if (!ok) {
+      setProcessing(false);
+      setStatusText('');
+      setAwaitingUpiReturn(true);
+    }
+  };
 
   // Customer details (used on iiskills page)
   const [firstName, setFirstName] = useState('');
@@ -258,6 +266,7 @@ export default function SegmentPaymentPage({
     setProcessing(true);
     setStatusText('Creating order…');
     setError('');
+    setAwaitingUpiReturn(false);
     setConfirmRetryPayload(null);
 
     const apiBase = getApiBaseUrl();
@@ -340,8 +349,9 @@ export default function SegmentPaymentPage({
       }
 
       setStatusText('Payment window opened — complete payment to continue…');
-      userLeftForUpiRef.current = false;
-      checkoutOpenedAtRef.current = Date.now();
+
+      const mobileCheckout = isMobileCheckout();
+      const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
 
       pendingCheckoutRef.current = {
         orderId: createJson.orderId,
@@ -369,8 +379,12 @@ export default function SegmentPaymentPage({
         order_id: createJson.orderId,
         retry: { enabled: false },
         ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+        ...(mobileCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
         handler: async function (resp) {
+          // Mobile UPI completes via server callback after redirect — ignore JS handler.
+          if (mobileCheckout) return;
+
           try {
             if (
               !resp?.razorpay_order_id ||
@@ -384,7 +398,7 @@ export default function SegmentPaymentPage({
             }
 
             pendingCheckoutRef.current = null;
-            userLeftForUpiRef.current = false;
+            setAwaitingUpiReturn(false);
             setStatusText('Verifying payment…');
 
             await verifyPayment({
@@ -405,13 +419,13 @@ export default function SegmentPaymentPage({
           escape: false,
           backdropclose: false,
           ondismiss: function () {
-            if (isMobileCheckout() && pendingCheckoutRef.current) {
-              setStatusText('Complete payment in your UPI app, then return to this page.');
+            if (pendingCheckoutRef.current) {
+              setAwaitingUpiReturn(true);
+              setError('');
               setProcessing(false);
+              setStatusText('');
               return;
             }
-            pendingCheckoutRef.current = null;
-            userLeftForUpiRef.current = false;
             setError('Payment cancelled. No money was debited.');
             setProcessing(false);
             setStatusText('');
@@ -424,9 +438,17 @@ export default function SegmentPaymentPage({
       const rzp = new window.Razorpay(options);
 
       rzp.on('payment.failed', function (resp) {
+        if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
+          setAwaitingUpiReturn(true);
+          setError('');
+          setProcessing(false);
+          setStatusText('');
+          return;
+        }
+
         needsFreshOrderRef.current = true;
         pendingCheckoutRef.current = null;
-        userLeftForUpiRef.current = false;
+        setAwaitingUpiReturn(false);
 
         const msg =
           resp?.error?.description ||
@@ -876,6 +898,44 @@ export default function SegmentPaymentPage({
           >
             {processing ? statusText || 'Processing…' : `Pay ${displayPrice || '₹116.82'}`}
           </button>
+
+          {awaitingUpiReturn && pendingCheckoutRef.current && (
+            <>
+              <div
+                style={{
+                  background: '#eff6ff',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: 12,
+                  padding: '0.9rem',
+                  color: '#1d4ed8',
+                  fontSize: '0.9rem',
+                  textAlign: 'center',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                Complete payment in your UPI app. After paying, tap below to continue.
+              </div>
+              <button
+                onClick={checkPaymentStatus}
+                disabled={processing}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  borderRadius: 12,
+                  border: `2px solid ${accentColor}`,
+                  background: 'transparent',
+                  color: accentColor,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  transition: '0.2s',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                {processing ? statusText || 'Checking…' : 'Check payment status'}
+              </button>
+            </>
+          )}
 
           {confirmRetryPayload && (
             <button

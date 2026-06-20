@@ -218,7 +218,35 @@ export default async function handler(req, res) {
     });
   }
 
-  // Legacy Standard Checkout POST callback
+  // Standard Checkout redirect (mobile callback_url — some clients use GET query params)
+  if (
+    req.method === 'GET' &&
+    req.query.razorpay_payment_id &&
+    req.query.razorpay_order_id &&
+    req.query.razorpay_signature
+  ) {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.query;
+
+    let transaction = null;
+    if (supabase) {
+      transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
+    }
+
+    const appName = transaction?.app_name || 'iiskills';
+
+    return finalizeAndRedirect(res, {
+      transaction,
+      appName,
+      paymentParams: {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        purchaseId: transaction?.session_id,
+      },
+    });
+  }
+
+  // Standard Checkout POST callback (mobile redirect and desktop)
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
