@@ -33,13 +33,26 @@ async function loadTransaction(supabase, { orderId, referenceId }) {
   }
 
   if (referenceId) {
-    const { data } = await supabase
+    const { data: exact } = await supabase
       .from('payment_transactions')
       .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
       .eq('session_id', referenceId)
       .order('created_at', { ascending: false })
       .limit(1);
-    if (data?.[0]) return data[0];
+    if (exact?.[0]) return exact[0];
+
+    // reference_id may be purchaseId_suffix from buildUniqueReferenceId
+    const baseSessionId = referenceId.replace(/_[a-z0-9]+$/i, '');
+    if (baseSessionId && baseSessionId !== referenceId) {
+      const { data: byBase } = await supabase
+        .from('payment_transactions')
+        .select('app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id')
+        .eq('session_id', baseSessionId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (byBase?.[0]) return byBase[0];
+    }
   }
 
   return null;
