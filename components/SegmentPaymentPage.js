@@ -544,13 +544,13 @@ export default function SegmentPaymentPage({
           {isExternalTokenSegment && activeTokenKind === 'iiskills' && (
             <div style={{ marginBottom: '1.5rem' }}>
               <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-                UPI mobile number *
+                UPI payment mobile number *
               </p>
               <input
                 type="tel"
                 value={upiPhone}
                 onChange={(e) => setUpiPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                placeholder="10-digit number registered with GPay/UPI"
+                placeholder="10-digit number linked to your paying UPI app"
                 style={{
                   width: '100%',
                   padding: '0.75rem',
@@ -561,7 +561,8 @@ export default function SegmentPaymentPage({
                 }}
               />
               <p style={{ color: '#6b7280', fontSize: '0.8rem', marginTop: '0.4rem', lineHeight: 1.4 }}>
-                UPI opens in GPay/PhonePe using this number. It must match your UPI app.
+                Use the number linked to the UPI app you will pay with. It does not need to match your
+                iiskills account number.
               </p>
               {upiPhone && !upiPhoneValid && (
                 <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.3rem' }}>
