@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -60,6 +60,43 @@ const COURSE_LABELS = {
 
 const PHONE_RE = /^\d{10}$/;
 
+const DASHBOARD_URLS = {
+  iiskills: 'https://iiskills.in/dashboard',
+  'uriq.in': 'https://uriq.in/dashboard',
+};
+
+function finishPaymentRedirect(redirect, sessionId) {
+  const join = redirect.includes('?') ? '&' : '?';
+  window.location.href = sessionId
+    ? `${redirect}${join}session_id=${encodeURIComponent(sessionId)}&status=success`
+    : `${redirect}${join}status=success`;
+}
+
+function loadRazorpayCheckoutScript() {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && window.Razorpay) {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Razorpay script failed')), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Razorpay script failed'));
+    document.body.appendChild(script);
+  });
+}
+
 export default function SegmentPaymentPage({
   segmentKey,
   brandName,
@@ -113,6 +150,72 @@ export default function SegmentPaymentPage({
   const [error, setError] = useState('');
   const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);
   const needsFreshOrderRef = useRef(false);
+  const pendingCheckoutRef = useRef(null);
+  const resumeInFlightRef = useRef(false);
+
+  const tryResumePayment = async () => {
+    const pending = pendingCheckoutRef.current;
+    if (!pending || resumeInFlightRef.current) return false;
+
+    resumeInFlightRef.current = true;
+    setStatusText('Checking payment status…');
+
+    try {
+      const body = {
+        order_id: pending.orderId,
+        purchaseId: pending.purchaseId,
+        course: pending.course,
+        app_name: pending.segmentKey,
+      };
+
+      if (pending.activeTokenKind === 'uriq') {
+        body.uriq_token = pending.rawToken;
+      } else if (pending.activeTokenKind === 'iiskills') {
+        body.iiskills_token = pending.rawToken;
+      }
+
+      const res = await fetchWithTimeout(`${getApiBaseUrl()}/api/payments/resume-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await readJsonResponse(res);
+
+      if (json?.paid && json?.redirect_url) {
+        pendingCheckoutRef.current = null;
+        setStatusText('Redirecting…');
+        finishPaymentRedirect(json.redirect_url);
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      console.error('[payment] resume check failed:', e);
+      return false;
+    } finally {
+      resumeInFlightRef.current = false;
+    }
+  };
+
+  const tryResumePaymentRef = useRef(tryResumePayment);
+  tryResumePaymentRef.current = tryResumePayment;
+
+  useEffect(() => {
+    if (!isMobileCheckout()) return undefined;
+
+    const onReturn = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!pendingCheckoutRef.current) return;
+      void tryResumePaymentRef.current();
+    };
+
+    window.addEventListener('pageshow', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      window.removeEventListener('pageshow', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+  }, []);
 
   // Customer details (used on iiskills page)
   const [firstName, setFirstName] = useState('');
@@ -209,38 +312,51 @@ export default function SegmentPaymentPage({
       needsFreshOrderRef.current = false;
       setStatusText('Loading payment gateway…');
 
-      // Load Razorpay checkout script
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      document.body.appendChild(script);
-
-      const loadTimeout = setTimeout(() => {
-        console.error('[payment] Razorpay script load timed out');
-        if (script.parentNode) document.body.removeChild(script);
-        setError('Payment gateway took too long to load. Please refresh and try again.');
+      try {
+        await loadRazorpayCheckoutScript();
+      } catch {
+        setError('Failed to load payment gateway. Please try again.');
         setProcessing(false);
         setStatusText('');
-      }, 15000);
+        return;
+      }
 
-      script.onload = () => {
-        clearTimeout(loadTimeout);
-        console.log('[payment] Razorpay script loaded, opening checkout');
+      console.log('[payment] Razorpay script loaded, opening checkout');
 
-        setStatusText('Payment window opened — complete payment to continue…');
+      setStatusText('Payment window opened — complete payment to continue…');
 
-        const mobileCheckout = isMobileCheckout();
+      const mobileCheckout = isMobileCheckout();
+      const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
 
-        const options = {
-          key: createJson.keyId,
-          amount: createJson.amount,
-          currency: createJson.currency,
-          name: brandName,
-          description,
-          order_id: createJson.orderId,
-          retry: { enabled: false },
+      pendingCheckoutRef.current = {
+        orderId: createJson.orderId,
+        purchaseId,
+        course,
+        activeTokenKind,
+        rawToken,
+        segmentKey,
+      };
 
-          handler: async function (resp) {
+      const prefill = {};
+      const contactPhone = tokenPayload?.phone || tokenPayload?.user_phone;
+      if (contactPhone) prefill.contact = String(contactPhone);
+      if (tokenPayload?.name || tokenPayload?.customer_name) {
+        prefill.name = tokenPayload.name || tokenPayload.customer_name;
+      }
+      if (userEmailFromToken) prefill.email = userEmailFromToken;
+
+      const options = {
+        key: createJson.keyId,
+        amount: createJson.amount,
+        currency: createJson.currency,
+        name: brandName,
+        description,
+        order_id: createJson.orderId,
+        retry: { enabled: false },
+        ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+        ...(mobileCheckout ? { callback_url: callbackUrl } : {}),
+
+        handler: async function (resp) {
             try {
               // Guard: only verify on a real success callback with required IDs.
               if (
@@ -276,13 +392,17 @@ export default function SegmentPaymentPage({
           },
 
           modal: {
+            confirm_close: true,
+            escape: false,
+            backdropclose: false,
             ondismiss: function () {
               console.log('[payment] Checkout modal dismissed');
               if (mobileCheckout) {
                 setStatusText('Complete payment in your UPI app, then return here.');
-                setProcessing(true);
+                void tryResumePayment();
                 return;
               }
+              pendingCheckoutRef.current = null;
               setError('Payment cancelled. No money was debited.');
               setProcessing(false);
               setStatusText('');
@@ -294,31 +414,27 @@ export default function SegmentPaymentPage({
 
         const rzp = new window.Razorpay(options);
 
-        // IMPORTANT: handle checkout failures (desktop deep-link failures, insufficient funds, etc.)
-        rzp.on('payment.failed', function (resp) {
+        rzp.on('payment.failed', async function (resp) {
           console.error('[payment] payment.failed:', resp?.error);
+
+          const failureText = resp?.error?.description || resp?.error?.reason || '';
+          if (/delay|cancelled|UPI/i.test(failureText)) {
+            const resumed = await tryResumePayment();
+            if (resumed) return;
+          }
+
           needsFreshOrderRef.current = true;
+          pendingCheckoutRef.current = null;
 
-          const msg =
-            resp?.error?.description ||
-            resp?.error?.reason ||
-            'Payment failed. Tap Pay again to start a fresh attempt.';
-
-          setError(msg);
+          setError(
+            failureText ||
+              'Payment failed. Tap Pay again to start a fresh attempt.',
+          );
           setProcessing(false);
           setStatusText('');
         });
 
         rzp.open();
-      };
-
-      script.onerror = () => {
-        clearTimeout(loadTimeout);
-        console.error('[payment] Failed to load Razorpay script');
-        setError('Failed to load payment gateway. Please try again.');
-        setProcessing(false);
-        setStatusText('');
-      };
     } catch (e) {
       console.error('[payment] Unexpected error:', e);
       setError(e?.message || 'Payment failed. Please try again.');
@@ -428,17 +544,16 @@ export default function SegmentPaymentPage({
     if (json?.success) {
       console.log('[payment] Verification successful, redirecting');
       setStatusText('Redirecting…');
+      pendingCheckoutRef.current = null;
 
       const redirect =
-        json.redirect_url || json.return_url || (orderData && orderData.return_url);
+        json.redirect_url ||
+        json.return_url ||
+        (orderData && orderData.return_url) ||
+        DASHBOARD_URLS[segmentKey];
 
       if (redirect) {
-        const join = redirect.includes('?') ? '&' : '?';
-        const sessionId = json.session_id || (orderData && orderData.session_id);
-
-        window.location.href = sessionId
-          ? `${redirect}${join}session_id=${encodeURIComponent(sessionId)}&status=success`
-          : `${redirect}${join}status=success`;
+        finishPaymentRedirect(redirect, json.session_id || (orderData && orderData.session_id));
       } else {
         router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
       }
