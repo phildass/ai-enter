@@ -499,48 +499,12 @@ export default function SegmentPaymentPage({
           </div>
 
           {allowedCourses && router.isReady && (
-            <div style={{ marginBottom: '1.5rem' }}>
-              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-                Select your course:
-              </p>
-
-              <select
-                value={course}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  borderRadius: 8,
-                  border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`,
-                  fontSize: '0.95rem',
-                  color: '#374151',
-                  background: 'white',
-                  cursor: 'pointer',
-                }}
-              >
-                <option value="">-- Select a course --</option>
-                {allowedCourses.map((c) => (
-                  <option key={c} value={c}>
-                    {COURSE_LABELS[c] || c}
-                  </option>
-                ))}
-              </select>
-
-              {!courseAllowed && course === '' && (
-                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-                  Please select a course to continue.
-                </p>
-              )}
-            </div>
-          )}
-
-{allowedCourses && router.isReady && (
   <div style={{ marginBottom: '1.5rem' }}>
     <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
       Course:
     </p>
     {new Date() < new Date('2026-07-01') ? (
-      <div style={{ padding: '0.75rem', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151' }}>
+      <div style={{ padding: '0.75rem', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: '0.95rem' }}>
         <strong>ALL</strong> (Launch Offer)
       </div>
     ) : (
