@@ -120,6 +120,13 @@ export default async function handler(req, res) {
       });
     }
 
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
+
+    const freshOrder = Boolean(req.body.fresh_order);
+
     // --- Idempotency / reuse protection (requires Supabase configured) ---
     if (supabase && app_name && session_id) {
       // Find latest transaction for this app_name + session_id
@@ -137,25 +144,66 @@ export default async function handler(req, res) {
       } else if (existing && existing.length > 0) {
         const row = existing[0];
 
-        // If already paid, do not allow reusing the same purchase/session link
-        if (row.status === 'paid') {
+        // Already completed (verify-payment writes status = success)
+        if (row.status === 'success' || row.status === 'paid') {
           return res.status(409).json({
             error: 'This payment link has already been used. Please start a new purchase.',
           });
         }
 
-        // If there is already a pending order, reuse it (do NOT create new order)
-        if (row.status === 'pending' && row.razorpay_order_id) {
-          return res.status(200).json({
-            orderId: row.razorpay_order_id,
-            amount: Math.round((row.amount || (amount_paise || 11682) / 100) * 100), // paise
-            currency: row.currency || currency || 'INR',
-            keyId: publicKey,
-            session_id,
-            return_url: row.return_url || return_url || null,
+        if (row.status === 'failed' || freshOrder) {
+          // Prior attempt failed — create a new Razorpay order below.
+        } else if (row.status === 'pending' && row.razorpay_order_id) {
+          try {
+            const existingOrder = await razorpay.orders.fetch(row.razorpay_order_id);
 
-            reused: true,
-          });
+            if (existingOrder.status === 'paid') {
+              await supabase
+                .from('payment_transactions')
+                .update({ status: 'success', updated_at: new Date().toISOString() })
+                .eq('id', row.id);
+              return res.status(409).json({
+                error: 'This payment link has already been used. Please start a new purchase.',
+              });
+            }
+
+            // Only reuse orders that have never been attempted (UPI opens move to attempted).
+            if (existingOrder.status === 'created') {
+              if (handoff_token) {
+                await supabase
+                  .from('payment_transactions')
+                  .update({ handoff_token, updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              }
+              return res.status(200).json({
+                orderId: existingOrder.id,
+                amount: existingOrder.amount,
+                currency: existingOrder.currency || currency || 'INR',
+                keyId: publicKey,
+                session_id,
+                return_url: row.return_url || return_url || null,
+                reused: true,
+              });
+            }
+
+            // attempted — UPI was tried and failed; must create a fresh order id.
+            console.log(
+              `[create-order] Replacing attempted Razorpay order ${row.razorpay_order_id} for session ${session_id}`,
+            );
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', row.id);
+          } catch (fetchErr) {
+            console.error(
+              '[create-order] Failed to fetch existing Razorpay order (creating fresh):',
+              fetchErr.message,
+            );
+            await supabase
+              .from('payment_transactions')
+              .update({ status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', row.id);
+          }
         }
       }
     }
@@ -163,18 +211,14 @@ export default async function handler(req, res) {
 
     // --- Create a new Razorpay order ---
 
-    const razorpay = new Razorpay({
-      key_id: keyId,
-      key_secret: keySecret,
-    });
-
     const finalAmountPaise = amount_paise || 11682;
     const finalCurrency = currency || 'INR';
+    const receiptSuffix = Date.now().toString(36);
 
     const order = await razorpay.orders.create({
       amount: finalAmountPaise,
       currency: finalCurrency,
-      receipt: `${app_name}_${session_id || Date.now()}`.slice(0, 40),
+      receipt: `${app_name}_${session_id || 'anon'}_${receiptSuffix}`.slice(0, 40),
       notes: {
         user_id,
         app_name,

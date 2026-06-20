@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -33,6 +33,11 @@ async function readJsonResponse(res) {
 function isMobileCheckout() {
   if (typeof window === 'undefined') return false;
   return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(navigator.userAgent);
+}
+
+function appendFreshOrderFlag(body, needsFreshOrder) {
+  if (!needsFreshOrder) return body;
+  return { ...body, fresh_order: true };
 }
 
 function fetchWithTimeout(url, options) {
@@ -107,6 +112,7 @@ export default function SegmentPaymentPage({
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
   const [confirmRetryPayload, setConfirmRetryPayload] = useState(null);
+  const needsFreshOrderRef = useRef(false);
 
   // Customer details (used on iiskills page)
   const [firstName, setFirstName] = useState('');
@@ -173,7 +179,7 @@ export default function SegmentPaymentPage({
         createRes = await fetchWithTimeout(`${apiBase}/api/payments/create-order`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify(appendFreshOrderFlag(body, needsFreshOrderRef.current)),
         });
       } catch (e) {
         if (e.name === 'AbortError') {
@@ -199,7 +205,8 @@ export default function SegmentPaymentPage({
         throw new Error(createJson?.error || 'Payment could not be initiated. Please try again.');
       }
 
-      console.log('[payment] Order created:', createJson.orderId);
+      console.log('[payment] Order created:', createJson.orderId, createJson.reused ? '(reused)' : '(new)');
+      needsFreshOrderRef.current = false;
       setStatusText('Loading payment gateway…');
 
       // Load Razorpay checkout script
@@ -223,7 +230,6 @@ export default function SegmentPaymentPage({
         setStatusText('Payment window opened — complete payment to continue…');
 
         const mobileCheckout = isMobileCheckout();
-        const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
 
         const options = {
           key: createJson.keyId,
@@ -232,17 +238,9 @@ export default function SegmentPaymentPage({
           name: brandName,
           description,
           order_id: createJson.orderId,
-          ...(mobileCheckout
-            ? {
-                callback_url: callbackUrl,
-                redirect: true,
-              }
-            : {}),
+          retry: { enabled: false },
 
           handler: async function (resp) {
-            // Mobile UPI opens an external app; Razorpay uses callback_url instead.
-            if (mobileCheckout) return;
-
             try {
               // Guard: only verify on a real success callback with required IDs.
               if (
@@ -281,8 +279,8 @@ export default function SegmentPaymentPage({
             ondismiss: function () {
               console.log('[payment] Checkout modal dismissed');
               if (mobileCheckout) {
-                // Switching to a UPI app can dismiss the modal before callback completes.
-                setStatusText('If you completed UPI payment, please wait…');
+                setStatusText('Complete payment in your UPI app, then return here.');
+                setProcessing(true);
                 return;
               }
               setError('Payment cancelled. No money was debited.');
@@ -299,11 +297,12 @@ export default function SegmentPaymentPage({
         // IMPORTANT: handle checkout failures (desktop deep-link failures, insufficient funds, etc.)
         rzp.on('payment.failed', function (resp) {
           console.error('[payment] payment.failed:', resp?.error);
+          needsFreshOrderRef.current = true;
 
           const msg =
             resp?.error?.description ||
             resp?.error?.reason ||
-            'Payment failed. Please try again using UPI QR / Google Pay / card.';
+            'Payment failed. Tap Pay again to start a fresh attempt.';
 
           setError(msg);
           setProcessing(false);
