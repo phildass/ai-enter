@@ -79,8 +79,11 @@ log "Checked out commit: $(git rev-parse --short HEAD)"
 log "Enabling corepack (ok if it fails)"
 corepack enable >/dev/null 2>&1 || true
 
-# Copy env file if present
-if [ -f /etc/aienter.env ]; then
+# Copy env file if present (support both legacy and current filenames)
+if [ -f /etc/ai-enter.env ]; then
+  cp /etc/ai-enter.env "$NEW_DIR/.env"
+  log "Copied /etc/ai-enter.env -> $NEW_DIR/.env"
+elif [ -f /etc/aienter.env ]; then
   cp /etc/aienter.env "$NEW_DIR/.env"
   log "Copied /etc/aienter.env -> $NEW_DIR/.env"
 fi

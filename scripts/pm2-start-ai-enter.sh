@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+#!/usr/bin/env bash
+set -euo pipefail
+
 # Load env (must contain IISKILLS_PAYMENT_TOKEN_SECRET and AIENTER_CONFIRMATION_SIGNING_SECRET)
 set -a
-source /etc/ai-enter.env
+if [ -f /etc/ai-enter.env ]; then
+  source /etc/ai-enter.env
+elif [ -f /etc/aienter.env ]; then
+  source /etc/aienter.env
+elif [ -f /var/www/ai-enter/.env ]; then
+  source /var/www/ai-enter/.env
+fi
 set +a
 
 cd /var/www/ai-enter

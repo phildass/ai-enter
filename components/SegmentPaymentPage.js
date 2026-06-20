@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -27,6 +27,7 @@ const COURSE_LABELS = {
   'learn-developer': 'Learn Developer',
   'learn-pr': 'Learn PR',
   'learn-management': 'Learn Management',
+  'all-courses-bundle': 'All Courses (5 Paid Apps)',
 };
 
 const PHONE_RE = /^\d{10}$/;
@@ -48,8 +49,11 @@ export default function SegmentPaymentPage({
   description,
   tokenPayload,
   rawToken,
+  tokenKind,
   tokenError,
   allowedCourses,
+  fixedCourseLabel,
+  paymentCourse,
   displayPrice,
   priceBreakdown,
 }) {
@@ -65,9 +69,14 @@ export default function SegmentPaymentPage({
   const courseFromQuery = router.isReady ? router.query.course : undefined;
 
   const [selectedCourse, setSelectedCourse] = useState('');
-  const course = allowedCourses ? courseFromQuery || selectedCourse || '' : null;
+  const selectedOrQueryCourse = allowedCourses ? courseFromQuery || selectedCourse || '' : null;
+  const course = paymentCourse || selectedOrQueryCourse || null;
 
-  const courseAllowed = !allowedCourses || allowedCourses.includes(course);
+  const courseAllowed =
+    fixedCourseLabel ||
+    paymentCourse ||
+    !allowedCourses ||
+    allowedCourses.includes(selectedOrQueryCourse);
 
   const [processing, setProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
@@ -88,7 +97,9 @@ export default function SegmentPaymentPage({
     );
   }, [allowedCourses, firstName, lastName, phone]);
 
-  const isIiskillsSegment = segmentKey === 'iiskills' && !!rawToken;
+  const activeTokenKind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
+  const isExternalTokenSegment =
+    (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
 
   // Main pay action
   const startPayment = async () => {
@@ -102,9 +113,16 @@ export default function SegmentPaymentPage({
     try {
       let body;
 
-      if (isIiskillsSegment) {
+      if (isExternalTokenSegment) {
         if (!purchaseId) throw new Error('Invalid payment link. Missing purchaseId.');
-        body = { iiskills_token: rawToken, purchaseId };
+        body =
+          activeTokenKind === 'uriq'
+            ? { uriq_token: rawToken, purchaseId }
+            : {
+                iiskills_token: rawToken,
+                purchaseId,
+                ...(course ? { course } : {}),
+              };
       } else {
         body = rawToken
           ? {
@@ -176,8 +194,6 @@ export default function SegmentPaymentPage({
       script.onload = () => {
         clearTimeout(loadTimeout);
         console.log('[payment] Razorpay script loaded, opening checkout');
-
-        setLoadingStatus('Payment window opened — complete payment to continue');
 
         setStatusText('Payment window opened — complete payment to continue…');
 
@@ -282,20 +298,30 @@ export default function SegmentPaymentPage({
 
     let body;
 
-    if (isIiskillsSegment) {
+    if (isExternalTokenSegment) {
       if (!purchaseId) {
         setError('Invalid payment link. Missing purchaseId.');
         setProcessing(false);
         setStatusText('');
         return;
       }
-      body = {
-        razorpay_order_id,
-        razorpay_payment_id,
-        razorpay_signature,
-        iiskills_token: rawToken,
-        purchaseId,
-      };
+      body =
+        activeTokenKind === 'uriq' ?
+          {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            uriq_token: rawToken,
+            purchaseId,
+          }
+        : {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature,
+            iiskills_token: rawToken,
+            purchaseId,
+            ...(course ? { course } : {}),
+          };
     } else {
       body = rawToken
         ? {
@@ -446,7 +472,7 @@ export default function SegmentPaymentPage({
   const disablePay =
     processing ||
     !courseAllowed ||
-    (allowedCourses && (!course || !canSubmitCustomerDetails));
+    (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   return (
     <>
@@ -498,34 +524,106 @@ export default function SegmentPaymentPage({
             <p style={{ color: '#6b7280', fontSize: '0.9rem' }}>Complete Your Payment</p>
           </div>
 
-{allowedCourses && router.isReady && (
-  <div style={{ marginBottom: '1.5rem' }}>
-    <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
-      Course:
-    </p>
-    {new Date() < new Date('2026-07-01') ? (
-      <div style={{ padding: '0.75rem', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', color: '#374151', fontSize: '0.95rem' }}>
-        <strong>ALL</strong> (Launch Offer)
-      </div>
-    ) : (
-      <>
-        <select value={course} onChange={(e) => setSelectedCourse(e.target.value)} style={{width: '100%', padding: '0.75rem', borderRadius: 8, border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`, fontSize: '0.95rem', color: '#374151', background: 'white', cursor: 'pointer' }}>
-          <option value="">-- Select a course --</option>
-          {allowedCourses.map((c) => (
-            <option key={c} value={c}>
-              {COURSE_LABELS[c] || c}
-            </option>
-          ))}
-        </select>
-        {!courseAllowed && course === '' && (
-          <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-            Please select a course to continue.
-          </p>
-        )}
-      </>
-    )}
-  </div>
-)}
+          {fixedCourseLabel && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+                Course
+              </p>
+              <div
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 8,
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.95rem',
+                  color: '#374151',
+                  background: '#f9fafb',
+                }}
+              >
+                {fixedCourseLabel}
+              </div>
+            </div>
+          )}
+
+          {!fixedCourseLabel && allowedCourses && router.isReady && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ color: '#374151', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>
+                Select your course:
+              </p>
+
+              <select
+                value={selectedOrQueryCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  borderRadius: 8,
+                  border: `1px solid ${courseAllowed ? '#d1d5db' : '#f87171'}`,
+                  fontSize: '0.95rem',
+                  color: '#374151',
+                  background: 'white',
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">-- Select a course --</option>
+                {allowedCourses.map((c) => (
+                  <option key={c} value={c}>
+                    {COURSE_LABELS[c] || c}
+                  </option>
+                ))}
+              </select>
+
+              {!courseAllowed && selectedOrQueryCourse === '' && (
+                <p style={{ color: '#ef4444', fontSize: '0.8rem', marginTop: '0.4rem' }}>
+                  Please select a course to continue.
+                </p>
+              )}
+            </div>
+          )}
+
+          {allowedCourses && router.isReady && (
+            <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ flex: 1 }}>
+                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>
+                    First Name *
+                  </p>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="First name"
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.9rem',
+                      color: '#374151',
+                    }}
+                  />
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>
+                    Last Name *
+                  </p>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Last name"
+                    style={{
+                      width: '100%',
+                      padding: '0.65rem',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      fontSize: '0.9rem',
+                      color: '#374151',
+                    }}
+                  />
+                </div>
+              </div>
 
               <div>
                 <p style={{ color: '#374151', fontSize: '0.85rem', marginBottom: '0.3rem', fontWeight: 500 }}>

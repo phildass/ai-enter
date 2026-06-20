@@ -1,5 +1,6 @@
 import Razorpay from 'razorpay';
 import { getCourseById, getCurrentFee } from '../../lib/courses';
+import { getRazorpayCredentialsForApp } from '../../lib/payments';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,8 +20,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid course' });
     }
 
-    // Check if Razorpay credentials are set
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp('iiskills');
+    if (!keyId || !keySecret) {
       return res.status(500).json({
         error: 'Payment system not configured. Please contact administrator.',
       });
@@ -31,8 +32,8 @@ export default async function handler(req, res) {
 
     // Initialize Razorpay
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: keyId,
+      key_secret: keySecret,
     });
 
     // Create order
@@ -57,7 +58,7 @@ export default async function handler(req, res) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId: publicKey,
       feeInfo: feeInfo,
     });
   } catch (error) {

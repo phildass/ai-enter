@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
 import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
+import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
+import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -38,7 +40,11 @@ export default async function handler(req, res) {
     user_phone = payload.phone || payload.user_phone || null;
     customer_name = payload.name || payload.customer_name || null;
     app_name = 'iiskills';
-    course = payload.courseSlug;
+    course = resolveIiskillsCourseSlug(req.body.course || payload.courseSlug);
+
+    if (!IISKILLS_ALLOWED_COURSES.includes(course)) {
+      return res.status(400).json({ error: `Invalid course in token: ${course}` });
+    }
 
     amount_paise = payload.amount_paise || payload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;
     currency = payload.currency || 'INR';
@@ -91,10 +97,6 @@ export default async function handler(req, res) {
     }
   }
 
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    return res.status(500).json({ error: 'Payment system not configured' });
-  }
-
   // Supabase (optional but enables idempotency + "already paid" protection)
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -102,6 +104,18 @@ export default async function handler(req, res) {
     supabaseUrl && serviceRoleKey ? createClient(supabaseUrl, serviceRoleKey) : null;
 
   try {
+    if (!isSupportedPaymentApp(app_name)) {
+      return res.status(400).json({
+        error: 'Unsupported payment app. Only iiskills and uriq.in are allowed.',
+      });
+    }
+
+    const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp(app_name);
+    if (!keyId || !keySecret) {
+      return res.status(500).json({
+        error: `Payment system not configured for ${app_name}`,
+      });
+    }
 
     // --- Idempotency / reuse protection (requires Supabase configured) ---
     if (supabase && app_name && session_id) {
@@ -133,7 +147,7 @@ export default async function handler(req, res) {
             orderId: row.razorpay_order_id,
             amount: Math.round((row.amount || (amount_paise || 11682) / 100) * 100), // paise
             currency: row.currency || currency || 'INR',
-            keyId: process.env.RAZORPAY_KEY_ID,
+            keyId: publicKey,
             session_id,
             return_url: row.return_url || return_url || null,
 
@@ -147,8 +161,8 @@ export default async function handler(req, res) {
     // --- Create a new Razorpay order ---
 
     const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
+      key_id: keyId,
+      key_secret: keySecret,
     });
 
     const finalAmountPaise = amount_paise || 11682;
@@ -200,7 +214,7 @@ export default async function handler(req, res) {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      keyId: publicKey,
       session_id,
       return_url: return_url || null,
       reused: false,

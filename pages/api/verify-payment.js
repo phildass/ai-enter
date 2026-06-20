@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import supabase from '../../lib/supabase';
+import { getRazorpayCredentialsForApp } from '../../lib/payments';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -21,14 +22,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing payment details' });
     }
 
-    if (!process.env.RAZORPAY_KEY_SECRET) {
+    const { keySecret } = getRazorpayCredentialsForApp('iiskills');
+    if (!keySecret) {
       return res.status(500).json({ error: 'Payment system not configured' });
     }
 
     // Verify signature
     const body = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+      .createHmac('sha256', keySecret)
       .update(body)
       .digest('hex');
 
