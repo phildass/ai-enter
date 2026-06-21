@@ -56,6 +56,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       paid: true,
+      captured: true,
+      payment_status: 'captured',
       redirect_url:
         transaction.return_url || DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills,
     });
@@ -80,14 +82,14 @@ export default async function handler(req, res) {
     payments = await razorpay.orders.fetchPayments(order_id);
   } catch (err) {
     console.error('[resume-payment] fetchPayments failed:', err.message);
-    return res.status(200).json({ success: false, paid: false, pending: true });
+    return res.status(200).json({ success: false, paid: false, pending: true, payment_status: 'pending' });
   }
 
   // Only confirm after Razorpay reports captured funds — never on authorized/pending.
   const captured = payments?.items?.find((p) => p.status === 'captured');
 
   if (!captured?.id) {
-    return res.status(200).json({ success: false, paid: false, pending: true });
+    return res.status(200).json({ success: false, paid: false, pending: true, payment_status: 'pending' });
   }
 
   let orderAmountPaise;
@@ -96,14 +98,14 @@ export default async function handler(req, res) {
     orderAmountPaise = order.amount;
   } catch (err) {
     console.error('[resume-payment] order fetch failed:', err.message);
-    return res.status(200).json({ success: false, paid: false, pending: true });
+    return res.status(200).json({ success: false, paid: false, pending: true, payment_status: 'pending' });
   }
 
   if (orderAmountPaise && captured.amount !== orderAmountPaise) {
     console.error(
       `[resume-payment] amount mismatch order=${orderAmountPaise} payment=${captured.amount}`,
     );
-    return res.status(200).json({ success: false, paid: false, pending: true });
+    return res.status(200).json({ success: false, paid: false, pending: true, payment_status: 'pending' });
   }
 
   const razorpay_payment_id = captured.id;
@@ -139,6 +141,8 @@ export default async function handler(req, res) {
       return res.status(200).json({
         success: true,
         paid: true,
+        captured: true,
+        payment_status: 'captured',
         confirmFailed: true,
         confirmError: result.confirmError,
         redirect_url: result.redirect_url || DEFAULT_REDIRECTS[appName],
@@ -148,6 +152,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       paid: true,
+      captured: true,
+      payment_status: 'captured',
       redirect_url:
         result.redirect_url ||
         transaction?.return_url ||

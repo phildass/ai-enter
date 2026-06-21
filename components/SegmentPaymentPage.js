@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -117,6 +117,32 @@ const PHONE_RE = /^\d{10}$/;
 
 const CHECKOUT_SESSION_KEY = 'aienter_checkout_session';
 
+/** UI phases — success UI only when phase === success (after captured payment). */
+const PAYMENT_PHASE = {
+  idle: 'idle',
+  initiating: 'initiating',
+  redirectingUpi: 'redirecting_upi',
+  awaitingUpi: 'awaiting_upi',
+  verifying: 'verifying',
+  success: 'success',
+};
+
+function isCapturedPaymentResponse(json) {
+  if (!json?.success) return false;
+  if (json.pending === true || json.paid === false) return false;
+  return json.payment_status === 'captured' || json.captured === true || json.paid === true;
+}
+
+function restoreCheckoutSession() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(CHECKOUT_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function persistCheckoutSession(snapshot) {
   if (typeof window === 'undefined') return false;
   if (!snapshot?.orderId) {
@@ -206,6 +232,7 @@ export default function SegmentPaymentPage({
 
   const [processing, setProcessing] = useState(false);
   const [isInitiating, setIsInitiating] = useState(false);
+  const [paymentPhase, setPaymentPhase] = useState(PAYMENT_PHASE.idle);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
   const [awaitingUpiReturn, setAwaitingUpiReturn] = useState(false);
@@ -236,6 +263,23 @@ export default function SegmentPaymentPage({
     setIsInitiating(false);
   };
 
+  useEffect(() => {
+    const session = restoreCheckoutSession();
+    if (!session?.orderId) return;
+
+    pendingCheckoutRef.current = {
+      orderId: session.orderId,
+      purchaseId: session.purchaseId,
+      course: session.course,
+      activeTokenKind: session.activeTokenKind,
+      rawToken: session.rawToken,
+      segmentKey: session.segmentKey || segmentKey,
+    };
+    setAwaitingUpiReturn(true);
+    setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+    setStatusText('Payment pending — please check your UPI app');
+  }, [segmentKey]);
+
   const openRazorpayOnce = (options) => {
     if (razorpayOpenedRef.current) {
       console.warn('[payment] blocked duplicate Razorpay.open()', {
@@ -258,6 +302,7 @@ export default function SegmentPaymentPage({
     if (!pending || resumeInFlightRef.current) return false;
 
     resumeInFlightRef.current = true;
+    setPaymentPhase(PAYMENT_PHASE.verifying);
     setStatusText('Checking payment status…');
 
     try {
@@ -281,16 +326,18 @@ export default function SegmentPaymentPage({
       });
       const json = await readJsonResponse(res);
 
-      if (json?.paid && json?.redirect_url) {
+      if (isCapturedPaymentResponse(json) && json?.redirect_url) {
         pendingCheckoutRef.current = null;
         clearCheckoutSession();
         setAwaitingUpiReturn(false);
-        setStatusText('Redirecting…');
+        setPaymentPhase(PAYMENT_PHASE.success);
+        setStatusText('Payment successful!');
         finishPaymentRedirect(json.redirect_url);
         return true;
       }
 
-      setStatusText('');
+      setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+      setStatusText('Payment pending — please check your UPI app');
       return false;
     } catch (e) {
       console.error('[payment] resume check failed:', e);
@@ -308,7 +355,8 @@ export default function SegmentPaymentPage({
     const ok = await tryResumePayment();
     if (!ok) {
       setProcessing(false);
-      setStatusText('');
+      setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+      setStatusText('Payment pending — please check your UPI app');
       setAwaitingUpiReturn(true);
     }
   };
@@ -357,6 +405,7 @@ export default function SegmentPaymentPage({
     createOrderFiredRef.current = true;
 
     setProcessing(true);
+    setPaymentPhase(PAYMENT_PHASE.initiating);
     setStatusText('Creating order…');
     setError('');
     setAwaitingUpiReturn(false);
@@ -425,6 +474,7 @@ export default function SegmentPaymentPage({
           setError(createJson?.error || 'This payment link has already been used. Please start a new purchase.');
           setProcessing(false);
           setStatusText('');
+          setPaymentPhase(PAYMENT_PHASE.idle);
           unlockPayButton();
           return;
         }
@@ -442,6 +492,7 @@ export default function SegmentPaymentPage({
         setError('Failed to load payment gateway. Please try again.');
         setProcessing(false);
         setStatusText('');
+        setPaymentPhase(PAYMENT_PHASE.idle);
         unlockPayButton();
         return;
       }
@@ -458,7 +509,18 @@ export default function SegmentPaymentPage({
 
       // External-token apps: full-page Razorpay checkout — entitlements via server callback only.
       if (usesRedirectCheckout) {
-        setStatusText('Redirecting to secure payment…');
+        setPaymentPhase(PAYMENT_PHASE.redirectingUpi);
+        setStatusText('Redirecting to UPI…');
+        setAwaitingUpiReturn(true);
+
+        pendingCheckoutRef.current = {
+          orderId: createJson.orderId,
+          purchaseId,
+          course,
+          activeTokenKind,
+          rawToken,
+          segmentKey,
+        };
 
         const persisted = persistCheckoutSession({
           orderId: createJson.orderId,
@@ -493,11 +555,14 @@ export default function SegmentPaymentPage({
         if (!rzp) {
           throw new Error('Payment window is already open. Please complete or cancel it first.');
         }
+        setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+        setStatusText('Payment pending — please check your UPI app');
         leavingForCheckout = true;
         return;
       }
 
-      setStatusText('Payment window opened — complete payment to continue…');
+      setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+      setStatusText('Payment pending — please check your UPI app');
 
       const mobileCheckout = isMobileCheckout();
 
@@ -544,14 +609,16 @@ export default function SegmentPaymentPage({
             ) {
               setError('Payment did not complete. Please try again.');
               setProcessing(false);
-              setStatusText('');
+              setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+              setStatusText('Payment pending — please check your UPI app');
               return;
             }
 
             pendingCheckoutRef.current = null;
             clearCheckoutSession();
             setAwaitingUpiReturn(false);
-            setStatusText('Verifying payment…');
+            setPaymentPhase(PAYMENT_PHASE.verifying);
+            setStatusText('Checking payment status…');
 
             await verifyPayment({
               razorpay_order_id: resp.razorpay_order_id,
@@ -562,7 +629,8 @@ export default function SegmentPaymentPage({
           } catch (e) {
             setError(e?.message || 'Payment verification failed. Please try again.');
             setProcessing(false);
-            setStatusText('');
+            setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+            setStatusText('Payment pending — please check your UPI app');
           }
         },
 
@@ -574,12 +642,14 @@ export default function SegmentPaymentPage({
             unlockPayButton();
             if (pendingCheckoutRef.current) {
               setAwaitingUpiReturn(true);
+              setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+              setStatusText('Payment pending — please check your UPI app');
               setError('');
               setProcessing(false);
-              setStatusText('');
               return;
             }
             clearCheckoutSession();
+            setPaymentPhase(PAYMENT_PHASE.idle);
             setError('Payment cancelled. No money was debited.');
             setProcessing(false);
             setStatusText('');
@@ -597,9 +667,10 @@ export default function SegmentPaymentPage({
       rzp.on('payment.failed', function (resp) {
         if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
           setAwaitingUpiReturn(true);
+          setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+          setStatusText('Payment pending — please check your UPI app');
           setError('');
           setProcessing(false);
-          setStatusText('');
           return;
         }
 
@@ -608,6 +679,7 @@ export default function SegmentPaymentPage({
         pendingCheckoutRef.current = null;
         clearCheckoutSession();
         setAwaitingUpiReturn(false);
+        setPaymentPhase(PAYMENT_PHASE.idle);
 
         const msg =
           resp?.error?.description ||
@@ -628,6 +700,7 @@ export default function SegmentPaymentPage({
       setError(e?.message || 'Payment failed. Please try again.');
       setProcessing(false);
       setStatusText('');
+      setPaymentPhase(PAYMENT_PHASE.idle);
     } finally {
       if (!leavingForCheckout) {
         unlockPayButton();
@@ -710,13 +783,21 @@ export default function SegmentPaymentPage({
 
     if (json?.success && json?.confirmFailed) {
       console.error(
-        '[payment] iiskills confirm failed:',
+        '[payment] iiskills activation failed after capture:',
         json.confirmError,
         'purchaseId:',
         json.purchaseId,
         'paymentId:',
         razorpay_payment_id,
       );
+
+      if (!isCapturedPaymentResponse(json)) {
+        setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+        setStatusText('Payment pending — please check your UPI app');
+        setAwaitingUpiReturn(true);
+        setProcessing(false);
+        return;
+      }
 
       setConfirmRetryPayload({
         razorpay_order_id,
@@ -726,17 +807,18 @@ export default function SegmentPaymentPage({
       });
 
       setError(
-        'Payment received but confirmation failed. Please use the button below to retry.',
+        'Payment captured but activation failed. Tap below to retry checking status.',
       );
       setProcessing(false);
       setStatusText('');
       return;
     }
 
-    if (json?.success) {
-      console.log('[payment] Verification successful, redirecting');
+    if (isCapturedPaymentResponse(json)) {
+      console.log('[payment] Payment captured — redirecting');
       clearCheckoutSession();
-      setStatusText('Redirecting…');
+      setPaymentPhase(PAYMENT_PHASE.success);
+      setStatusText('Payment successful!');
 
       const redirect =
         json.redirect_url ||
@@ -747,23 +829,37 @@ export default function SegmentPaymentPage({
       if (redirect) {
         finishPaymentRedirect(redirect, json.session_id || (orderData && orderData.session_id));
       } else {
-        router.push(`/payments/success?app=${encodeURIComponent(segmentKey)}`);
+        router.push(
+          `/payments/success?app=${encodeURIComponent(segmentKey)}&status=captured`,
+        );
       }
       return;
     }
 
+    if (json?.pending || res.status === 403) {
+      setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+      setStatusText('Payment pending — please check your UPI app');
+      setAwaitingUpiReturn(true);
+      setProcessing(false);
+      return;
+    }
+
     console.error('[payment] Verification failed:', json);
+    setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
     setError(
-      `Payment verification failed. Please contact support with your payment ID: ${razorpay_payment_id}`,
+      json?.error ||
+        `Payment not completed yet. Please finish in your UPI app or contact support with payment ID: ${razorpay_payment_id}`,
     );
+    setAwaitingUpiReturn(true);
     setProcessing(false);
-    setStatusText('');
+    setStatusText('Payment pending — please check your UPI app');
   };
 
-  const retryConfirmation = async () => {
+  const retryPaymentCheck = async () => {
     if (!confirmRetryPayload) return;
     setProcessing(true);
-    setStatusText('Retrying confirmation…');
+    setPaymentPhase(PAYMENT_PHASE.verifying);
+    setStatusText('Checking payment status…');
     setError('');
     await verifyPayment(confirmRetryPayload);
   };
@@ -823,6 +919,32 @@ export default function SegmentPaymentPage({
     (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   const payButtonDisabled = disablePay || isInitiating;
+
+  const showUpiPendingUi =
+    paymentPhase === PAYMENT_PHASE.redirectingUpi ||
+    paymentPhase === PAYMENT_PHASE.awaitingUpi ||
+    (awaitingUpiReturn && pendingCheckoutRef.current);
+
+  const showSuccessUi = paymentPhase === PAYMENT_PHASE.success;
+
+  const payButtonLabel = (() => {
+    switch (paymentPhase) {
+      case PAYMENT_PHASE.initiating:
+        return statusText || 'Creating order…';
+      case PAYMENT_PHASE.redirectingUpi:
+        return 'Redirecting to UPI…';
+      case PAYMENT_PHASE.awaitingUpi:
+        return 'Awaiting UPI authorization…';
+      case PAYMENT_PHASE.verifying:
+        return statusText || 'Checking payment status…';
+      case PAYMENT_PHASE.success:
+        return 'Payment successful!';
+      default:
+        return isInitiating || processing
+          ? statusText || 'Processing…'
+          : `Pay ${displayPrice || '₹116.82'}`;
+    }
+  })();
 
   return (
     <>
@@ -1098,10 +1220,27 @@ export default function SegmentPaymentPage({
               marginBottom: '0.75rem',
             }}
           >
-            {isInitiating || processing ? statusText || 'Processing…' : `Pay ${displayPrice || '₹116.82'}`}
+            {payButtonLabel}
           </button>
 
-          {awaitingUpiReturn && pendingCheckoutRef.current && (
+          {showSuccessUi && (
+            <div
+              style={{
+                background: '#ecfdf5',
+                border: '1px solid #86efac',
+                borderRadius: 12,
+                padding: '0.9rem',
+                color: '#166534',
+                fontSize: '0.9rem',
+                textAlign: 'center',
+                marginBottom: '0.75rem',
+              }}
+            >
+              Payment successful! Redirecting you now…
+            </div>
+          )}
+
+          {showUpiPendingUi && !showSuccessUi && (
             <>
               <div
                 style={{
@@ -1115,8 +1254,11 @@ export default function SegmentPaymentPage({
                   marginBottom: '0.75rem',
                 }}
               >
-                Complete payment in your UPI app. After paying, tap below to continue.
+                {paymentPhase === PAYMENT_PHASE.redirectingUpi
+                  ? 'Redirecting to UPI…'
+                  : 'Payment pending — please check your UPI app and enter your passcode.'}
               </div>
+              {pendingCheckoutRef.current && (
               <button
                 onClick={checkPaymentStatus}
                 disabled={processing}
@@ -1136,12 +1278,13 @@ export default function SegmentPaymentPage({
               >
                 {processing ? statusText || 'Checking…' : 'Check payment status'}
               </button>
+              )}
             </>
           )}
 
           {confirmRetryPayload && (
             <button
-              onClick={retryConfirmation}
+              onClick={retryPaymentCheck}
               disabled={processing}
               style={{
                 width: '100%',
@@ -1157,7 +1300,7 @@ export default function SegmentPaymentPage({
                 marginBottom: '0.75rem',
               }}
             >
-              {processing ? statusText || 'Retrying…' : 'Retry Confirmation'}
+              {processing ? statusText || 'Checking…' : 'Retry payment check'}
             </button>
           )}
 

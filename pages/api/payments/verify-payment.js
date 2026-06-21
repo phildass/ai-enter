@@ -10,6 +10,8 @@ export default async function handler(req, res) {
     return res.status(403).json({
       error:
         'This payment must complete via Razorpay redirect. Entitlements are granted only after captured payment is verified server-side.',
+      pending: true,
+      payment_status: 'pending',
     });
   }
 
@@ -38,6 +40,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       message: result.message,
+      captured: true,
+      payment_status: 'captured',
       redirect_url: result.redirect_url,
       transactionId: result.transactionId,
       session_id: result.session_id,

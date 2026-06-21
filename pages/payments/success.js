@@ -15,26 +15,36 @@ const appDetails = {
 export default function PaymentSuccess() {
   const router = useRouter();
   const hasError = router.isReady && Boolean(router.query.error);
-  const isPending = router.isReady && router.query.pending === '1';
+  const isCapturedSuccess =
+    router.isReady &&
+    (router.query.status === 'captured' || router.query.status === 'success');
+  const isPending =
+    router.isReady && !isCapturedSuccess && !hasError;
 
   useEffect(() => {
-    if (!router.isReady || hasError || isPending) return undefined;
+    if (!router.isReady || hasError || isPending || !isCapturedSuccess) return undefined;
 
     const timer = setTimeout(() => {
       window.location.href = appDetails.dashboardUrl;
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [router.isReady, hasError, isPending]);
+  }, [router.isReady, hasError, isPending, isCapturedSuccess]);
 
   const handleRedirectNow = () => {
     window.location.href = appDetails.dashboardUrl;
   };
 
+  const pageTitle = hasError
+    ? 'Payment Issue'
+    : isCapturedSuccess
+      ? 'Payment Successful'
+      : 'Payment Pending';
+
   return (
     <>
       <Head>
-        <title>Payment Successful - {appDetails.name}</title>
+        <title>{pageTitle} - {appDetails.name}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
@@ -62,32 +72,32 @@ export default function PaymentSuccess() {
         }}>
           <div style={{
             width: '72px', height: '72px',
-            background: appDetails.cardBg,
+            background: isCapturedSuccess ? appDetails.cardBg : '#eff6ff',
             borderRadius: '50%',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 1rem',
             fontSize: '2.5rem',
-          }}>✅</div>
+          }}>{isCapturedSuccess ? '✅' : isPending ? '⏳' : '⚠️'}</div>
 
           <h1 style={{ fontSize: '1.8rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
-            {hasError ? 'Payment Issue' : isPending ? 'Payment Pending' : 'Payment Successful!'}
+            {hasError ? 'Payment Issue' : isCapturedSuccess ? 'Payment Successful!' : 'Payment Pending'}
           </h1>
 
           <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
             {hasError ? (
               <span>{router.query.error}</span>
-            ) : isPending ? (
-              <span>
-                Complete payment in your UPI app, then return to iiskills.in to check your dashboard.
-              </span>
-            ) : (
+            ) : isCapturedSuccess ? (
               <>
                 Thank you for your payment to <strong>{appDetails.name}</strong>.
               </>
+            ) : (
+              <span>
+                Payment pending — please check your UPI app and enter your passcode. Access is granted only after your bank clears the transaction.
+              </span>
             )}
           </p>
 
-          {!hasError && !isPending && (
+          {isCapturedSuccess && (
           <div style={{
             background: appDetails.cardBg,
             borderLeft: `4px solid ${appDetails.accentColor}`,
@@ -97,15 +107,15 @@ export default function PaymentSuccess() {
             textAlign: 'left',
           }}>
             <p style={{ fontSize: '0.85rem', fontWeight: '700', color: appDetails.titleColor, marginBottom: '0.5rem' }}>
-              ⏰ Next Step: Access Your Course
+              Next step: access your course
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              Your iiskills access is being activated automatically. Redirecting to your dashboard in 3 seconds...
+              Your iiskills access is being activated. Redirecting to your dashboard in 3 seconds…
             </p>
           </div>
           )}
 
-          {!hasError && !isPending && (
+          {isCapturedSuccess && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
             <p>✅ Payment Amount: ₹116.82</p>
             <p>✅ Access Valid for {appDetails.validity}</p>
@@ -113,7 +123,7 @@ export default function PaymentSuccess() {
           </div>
           )}
 
-          {!hasError && !isPending && (
+          {isCapturedSuccess && (
           <button
             onClick={handleRedirectNow}
             style={{

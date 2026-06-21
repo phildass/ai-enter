@@ -55,9 +55,9 @@ function respondWaiting(res, { reason, paymentStatus, appName }) {
   const statusLine = paymentStatus ? `Payment status: ${paymentStatus}` : reason || 'Waiting for UPI';
   res.end(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Payment in progress</title></head>
+<title>Awaiting UPI authorization</title></head>
 <body style="font-family:system-ui,sans-serif;max-width:420px;margin:2rem auto;padding:0 1rem;text-align:center">
-<h1 style="font-size:1.35rem">Complete payment in your UPI app</h1>
+<h1 style="font-size:1.35rem">Awaiting UPI authorization</h1>
 <p style="color:#374151;line-height:1.5">Your payment is not finished yet. Open your UPI app, confirm the amount, and enter your PIN.</p>
 <p style="color:#6b7280;font-size:0.9rem">${statusLine}</p>
 <p style="color:#92400e;font-size:0.85rem;margin-top:1rem">Keep this page open until payment completes. Do not close the tab during UPI.</p>
@@ -195,7 +195,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
     console.error('[razorpay-callback] Origin confirm failed:', result.confirmError);
     return redirect(
       res,
-      `/payments/success?app=${encodeURIComponent(appName || 'iiskills')}&confirm=failed`,
+      `/payments/success?pending=1&confirm=failed&app=${encodeURIComponent(appName || 'iiskills')}`,
     );
   }
 
