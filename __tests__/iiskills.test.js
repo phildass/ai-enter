@@ -56,6 +56,7 @@ function buildJwt(payload, secret) {
     razorpayPaymentId: 'pay_xyz',
     paidAt: '2024-01-01T00:00:00.000Z',
     user_token: 'some.jwt.token',
+    event: 'payment.captured',
   };
 
   // Signature must be computed over the exact JSON string (no re-stringify mismatch)
@@ -95,6 +96,7 @@ function buildJwt(payload, secret) {
     'razorpayPaymentId',
     'paidAt',
     'user_token',
+    'event',
   ];
 
   // IISKILLS_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
@@ -108,6 +110,7 @@ function buildJwt(payload, secret) {
     razorpayPaymentId: 'pay_xyz',
     paidAt: new Date().toISOString(),
     user_token: 'some.jwt.token',
+    event: 'payment.captured',
   };
 
   for (const field of REQUIRED_FIELDS) {
@@ -138,6 +141,8 @@ function buildJwt(payload, secret) {
     !isNaN(Date.parse(confirmPayload.paidAt)),
     'paidAt must be a valid ISO 8601 date string',
   );
+
+  assert.strictEqual(confirmPayload.event, 'payment.captured', 'event must be payment.captured');
 
   console.log('✓ confirm payload: all required fields present and valid');
 })();

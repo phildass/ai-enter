@@ -32,11 +32,9 @@ function paymentErrorRedirect(res, message) {
   );
 }
 
-function paymentPendingRedirect(res, appName) {
-  return redirect(
-    res,
-    `/payments/success?pending=1&app=${encodeURIComponent(appName || 'iiskills')}`,
-  );
+function isPendingCaptureError(message) {
+  if (!message) return false;
+  return /not captured/i.test(message) || /complete payment in your UPI/i.test(message);
 }
 
 /**
@@ -53,6 +51,7 @@ function respondWaiting(res, { reason, paymentStatus, appName }) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.statusCode = 200;
   const portal = DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
+  const portalLabel = portal.replace(/^https?:\/\//, '');
   const statusLine = paymentStatus ? `Payment status: ${paymentStatus}` : reason || 'Waiting for UPI';
   res.end(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -61,7 +60,8 @@ function respondWaiting(res, { reason, paymentStatus, appName }) {
 <h1 style="font-size:1.35rem">Complete payment in your UPI app</h1>
 <p style="color:#374151;line-height:1.5">Your payment is not finished yet. Open your UPI app, confirm the amount, and enter your PIN.</p>
 <p style="color:#6b7280;font-size:0.9rem">${statusLine}</p>
-<p style="margin-top:1.5rem"><a href="${portal}" style="color:#4f46e5">Go to dashboard after paying</a></p>
+<p style="color:#92400e;font-size:0.85rem;margin-top:1rem">Keep this page open until payment completes. Do not close the tab during UPI.</p>
+<p style="margin-top:1.5rem;font-size:0.85rem;color:#6b7280">After paying, you can visit <a href="${portal}" style="color:#4f46e5">${portalLabel}</a></p>
 </body></html>`);
 }
 
@@ -181,7 +181,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
   }
 
   if (!result.ok) {
-    if (result.error?.includes('not captured') || result.error?.includes('not captured yet')) {
+    if (isPendingCaptureError(result.error)) {
       return respondWaiting(res, {
         reason: 'Payment not captured yet',
         paymentStatus: 'pending',
@@ -253,7 +253,11 @@ async function handleStandardCheckoutCallback(
     captureCheck = await assertPaymentCaptured(razorpay, razorpay_payment_id, razorpay_order_id);
   } catch (err) {
     console.error('[razorpay-callback] payment fetch failed:', err.message);
-    return paymentErrorRedirect(res, 'Unable to verify payment');
+    return respondWaiting(res, {
+      reason: 'Verifying payment with Razorpay',
+      paymentStatus: 'pending',
+      appName,
+    });
   }
 
   if (!captureCheck.ok) {
@@ -441,7 +445,11 @@ export default async function handler(req, res) {
       captureCheck = await assertPaymentCaptured(razorpay, razorpay_payment_id);
     } catch (err) {
       console.error('[razorpay-callback] payment fetch failed:', err.message);
-      return paymentErrorRedirect(res, 'Unable to verify payment');
+      return respondWaiting(res, {
+        reason: 'Verifying payment with Razorpay',
+        paymentStatus: 'pending',
+        appName,
+      });
     }
 
     if (!captureCheck.ok) {
