@@ -168,6 +168,28 @@ export default async function handler(req, res) {
             }
 
             if (existingOrder.status === 'created') {
+              let priorPayments = [];
+              try {
+                const paymentList = await razorpay.orders.fetchPayments(row.razorpay_order_id);
+                priorPayments = paymentList?.items || [];
+              } catch (payErr) {
+                console.warn(
+                  '[create-order] fetchPayments before reuse failed:',
+                  payErr.message,
+                );
+              }
+
+              const hasPriorAttempt = priorPayments.length > 0;
+
+              if (hasPriorAttempt) {
+                console.log(
+                  `[create-order] not reusing order ${row.razorpay_order_id} — prior payment attempts exist`,
+                );
+                await supabase
+                  .from('payment_transactions')
+                  .update({ status: 'failed', updated_at: new Date().toISOString() })
+                  .eq('id', row.id);
+              } else {
               const reuseUpdate = {
                 updated_at: new Date().toISOString(),
                 ...(handoff_token ? { handoff_token } : {}),
@@ -191,6 +213,7 @@ export default async function handler(req, res) {
                 return_url: row.return_url || return_url || null,
                 reused: true,
               });
+              }
             }
 
             console.log(

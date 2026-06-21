@@ -247,11 +247,13 @@ export default function SegmentPaymentPage({
   const razorpayOpenedRef = useRef(false);
   const payButtonRef = useRef(null);
   const graceNotifiedOrderRef = useRef(null);
+  const checkoutEngagedRef = useRef(false);
 
   const resetCheckoutForRetry = () => {
     clearCheckoutSession();
     pendingCheckoutRef.current = null;
     graceNotifiedOrderRef.current = null;
+    checkoutEngagedRef.current = false;
     needsFreshOrderRef.current = true;
     unlockPayButton();
     setProcessing(false);
@@ -301,6 +303,7 @@ export default function SegmentPaymentPage({
     paymentInFlightRef.current = false;
     createOrderFiredRef.current = false;
     razorpayOpenedRef.current = false;
+    checkoutEngagedRef.current = false;
     setIsInitiating(false);
   };
 
@@ -332,6 +335,7 @@ export default function SegmentPaymentPage({
       rawToken: session.rawToken,
       segmentKey: session.segmentKey || segmentKey,
     };
+    checkoutEngagedRef.current = true;
     setAwaitingUpiReturn(true);
     setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
     setStatusText('Payment pending — please check your UPI app');
@@ -385,6 +389,7 @@ export default function SegmentPaymentPage({
 
       if (isCapturedPaymentResponse(json) && json?.redirect_url) {
         pendingCheckoutRef.current = null;
+        checkoutEngagedRef.current = false;
         clearCheckoutSession();
         setAwaitingUpiReturn(false);
         setPaymentPhase(PAYMENT_PHASE.success);
@@ -437,9 +442,11 @@ export default function SegmentPaymentPage({
     (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
-  // iiskills: modal only — redirect+callback_url aborts UPI on payment.authorized.
-  const usesIiskillsModalCheckout =
+  const isIiskillsHandoff =
     segmentKey === 'iiskills' && activeTokenKind === 'iiskills' && !!rawToken;
+  // Mobile UPI intent: modal closes when the UPI app opens and Razorpay cancels the payment.
+  // Use full-page redirect + aienter callback (200 on authorize). Desktop keeps modal + QR UPI.
+  const usesIiskillsModalCheckout = isIiskillsHandoff && !isMobileCheckout();
   const usesRedirectCheckout = isExternalTokenSegment && !usesIiskillsModalCheckout;
 
   // Main pay action — atomic lock prevents duplicate create-order / double UPI intent.
@@ -558,12 +565,14 @@ export default function SegmentPaymentPage({
       }
 
       const callbackUrl =
-        segmentKey === 'iiskills' && activeTokenKind === 'iiskills' && rawToken
-          ? buildIiskillsRazorpayCallbackUrl({
-              tokenPayload,
-              rawToken,
-              purchaseId,
-            })
+        isIiskillsHandoff
+          ? isMobileCheckout()
+            ? `${window.location.origin}/api/payments/razorpay-callback`
+            : buildIiskillsRazorpayCallbackUrl({
+                tokenPayload,
+                rawToken,
+                purchaseId,
+              })
           : `${window.location.origin}/api/payments/razorpay-callback`;
 
       const prefill = {};
@@ -666,72 +675,62 @@ export default function SegmentPaymentPage({
         ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
         ...(mobileRedirectCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
-        handler: async function (resp) {
-          if (mobileRedirectCheckout) return;
+        ...(!usesIiskillsModalCheckout
+          ? {
+              handler: async function (resp) {
+                if (mobileRedirectCheckout) return;
 
-          try {
-            if (
-              !resp?.razorpay_order_id ||
-              !resp?.razorpay_payment_id ||
-              !resp?.razorpay_signature
-            ) {
-              setError('Payment did not complete. Please try again.');
-              setProcessing(false);
-              setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-              setStatusText('Payment pending — please check your UPI app');
-              return;
+                try {
+                  if (
+                    !resp?.razorpay_order_id ||
+                    !resp?.razorpay_payment_id ||
+                    !resp?.razorpay_signature
+                  ) {
+                    setError('Payment did not complete. Please try again.');
+                    setProcessing(false);
+                    setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+                    setStatusText('Payment pending — please check your UPI app');
+                    return;
+                  }
+
+                  pendingCheckoutRef.current = null;
+                  clearCheckoutSession();
+                  setAwaitingUpiReturn(false);
+                  setPaymentPhase(PAYMENT_PHASE.verifying);
+                  setStatusText('Checking payment status…');
+
+                  await verifyPayment({
+                    razorpay_order_id: resp.razorpay_order_id,
+                    razorpay_payment_id: resp.razorpay_payment_id,
+                    razorpay_signature: resp.razorpay_signature,
+                    orderData: createJson,
+                  });
+                } catch (e) {
+                  setError(e?.message || 'Payment verification failed. Please try again.');
+                  setProcessing(false);
+                  setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+                  setStatusText('Payment pending — please check your UPI app');
+                }
+              },
             }
-
-            setPaymentPhase(PAYMENT_PHASE.verifying);
-            setStatusText('Checking payment status…');
-
-            // iiskills: never trust JS handler alone — resume only after server-verified capture.
-            if (usesIiskillsModalCheckout) {
-              const ok = await tryResumePayment();
-              if (!ok) {
-                setAwaitingUpiReturn(true);
-                setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-                setStatusText('Payment pending — please check your UPI app');
-                setProcessing(false);
-              }
-              return;
-            }
-
-            pendingCheckoutRef.current = null;
-            clearCheckoutSession();
-            setAwaitingUpiReturn(false);
-
-            await verifyPayment({
-              razorpay_order_id: resp.razorpay_order_id,
-              razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature,
-              orderData: createJson,
-            });
-          } catch (e) {
-            setError(e?.message || 'Payment verification failed. Please try again.');
-            setProcessing(false);
-            setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-            setStatusText('Payment pending — please check your UPI app');
-          }
-        },
+          : {}),
 
         modal: {
-          confirm_close: true,
+          confirm_close: !usesIiskillsModalCheckout,
           escape: false,
           backdropclose: false,
           ondismiss: function () {
-            unlockPayButton();
             if (pendingCheckoutRef.current) {
               setAwaitingUpiReturn(true);
               setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-              setStatusText('Payment pending — please check your UPI app');
+              setStatusText('Complete payment in your UPI app, then tap Check payment status.');
               setError('');
               setProcessing(false);
-              if (usesIiskillsModalCheckout && pendingCheckoutRef.current?.orderId) {
-                void notifyIiskillsProcessing(pendingCheckoutRef.current.orderId);
-              }
+              // Modal closes when UPI opens — keep checkout lock; do not notify iiskills yet.
               return;
             }
+            checkoutEngagedRef.current = false;
+            unlockPayButton();
             clearCheckoutSession();
             setPaymentPhase(PAYMENT_PHASE.idle);
             setError('Payment cancelled. No money was debited.');
@@ -748,19 +747,21 @@ export default function SegmentPaymentPage({
         throw new Error('Payment window is already open. Please complete or cancel it first.');
       }
 
+      checkoutEngagedRef.current = true;
+      leavingForCheckout = true;
+
       rzp.on('payment.failed', function (resp) {
         if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
+          needsFreshOrderRef.current = true;
           setAwaitingUpiReturn(true);
           setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-          setStatusText('Payment pending — please check your UPI app');
+          setStatusText('Complete payment in your UPI app, then tap Check payment status.');
           setError('');
           setProcessing(false);
-          if (usesIiskillsModalCheckout && pendingCheckoutRef.current?.orderId) {
-            void notifyIiskillsProcessing(pendingCheckoutRef.current.orderId);
-          }
           return;
         }
 
+        checkoutEngagedRef.current = false;
         unlockPayButton();
         needsFreshOrderRef.current = true;
         pendingCheckoutRef.current = null;
@@ -778,7 +779,7 @@ export default function SegmentPaymentPage({
         setStatusText('');
       });
 
-      if (mobileRedirectCheckout) {
+      if (mobileRedirectCheckout && !usesIiskillsModalCheckout) {
         leavingForCheckout = true;
       }
       return;
@@ -788,8 +789,9 @@ export default function SegmentPaymentPage({
       setProcessing(false);
       setStatusText('');
       setPaymentPhase(PAYMENT_PHASE.idle);
+      checkoutEngagedRef.current = false;
     } finally {
-      if (!leavingForCheckout) {
+      if (!leavingForCheckout && !checkoutEngagedRef.current) {
         unlockPayButton();
       }
     }
