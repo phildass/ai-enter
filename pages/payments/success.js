@@ -146,6 +146,28 @@ export default function PaymentSuccess() {
           </button>
           )}
 
+          {hasError && (
+          <a
+            href="https://iiskills.in"
+            style={{
+              display: 'inline-block',
+              width: '100%',
+              padding: '0.75rem 1rem',
+              background: '#f3f4f6',
+              color: '#374151',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              fontSize: '0.95rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              marginBottom: '1rem',
+              textDecoration: 'none',
+            }}
+          >
+            Return to iiskills.in to try again
+          </a>
+          )}
+
           {isPending && (
           <a
             href={appDetails.dashboardUrl}

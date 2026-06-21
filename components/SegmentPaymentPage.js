@@ -248,6 +248,7 @@ export default function SegmentPaymentPage({
   const payButtonRef = useRef(null);
   const graceNotifiedOrderRef = useRef(null);
   const checkoutEngagedRef = useRef(false);
+  const startFreshPaymentRef = useRef(false);
 
   const resetCheckoutForRetry = () => {
     clearCheckoutSession();
@@ -449,8 +450,26 @@ export default function SegmentPaymentPage({
   const usesIiskillsModalCheckout = isIiskillsHandoff && !isMobileCheckout();
   const usesRedirectCheckout = isExternalTokenSegment && !usesIiskillsModalCheckout;
 
+  const tryPaymentAgain = () => {
+    if (!router.isReady) return;
+    resetCheckoutForRetry();
+    const { payment_retry: _ignored, ...restQuery } = router.query;
+    router.replace(
+      { pathname: router.pathname, query: { ...restQuery, payment_retry: '1' } },
+      undefined,
+      { shallow: false },
+    );
+  };
+
   // Main pay action — atomic lock prevents duplicate create-order / double UPI intent.
   const handlePay = async () => {
+    if (pendingCheckoutRef.current && !startFreshPaymentRef.current) {
+      setError(
+        'A payment is already in progress. Tap "Check payment status" below, or "Try payment again" to start over.',
+      );
+      return;
+    }
+    startFreshPaymentRef.current = false;
     console.log('[payment] handlePay start', {
       ts: new Date().toISOString(),
       segmentKey,
@@ -624,6 +643,22 @@ export default function SegmentPaymentPage({
           redirect: true,
           retry: { enabled: false },
           ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+          ...(isIiskillsHandoff && isMobileCheckout()
+            ? {
+                config: {
+                  display: {
+                    blocks: {
+                      upi: {
+                        name: 'Pay via UPI',
+                        instruments: [{ method: 'upi' }],
+                      },
+                    },
+                    sequence: ['block.upi'],
+                    preferences: { show_default_blocks: false },
+                  },
+                },
+              }
+            : {}),
           theme: { color: accentColor },
         };
 
@@ -1307,6 +1342,7 @@ export default function SegmentPaymentPage({
               pointerEvents: payButtonDisabled ? 'none' : 'auto',
               transition: '0.2s',
               marginBottom: '0.75rem',
+              display: showUpiPendingUi ? 'none' : 'block',
             }}
           >
             {payButtonLabel}
@@ -1368,6 +1404,25 @@ export default function SegmentPaymentPage({
                 {processing ? statusText || 'Checking…' : 'Check payment status'}
               </button>
               )}
+              <button
+                type="button"
+                onClick={tryPaymentAgain}
+                disabled={processing || isInitiating}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  borderRadius: 12,
+                  border: '1px solid #d1d5db',
+                  background: '#f9fafb',
+                  color: '#374151',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  cursor: processing || isInitiating ? 'not-allowed' : 'pointer',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                Try payment again
+              </button>
             </>
           )}
 

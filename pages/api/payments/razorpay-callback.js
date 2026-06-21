@@ -41,11 +41,27 @@ function isPendingCaptureError(message) {
  * HTTP 200 — do not redirect or grant entitlements while UPI is still in progress.
  * A 303 to an error/success page during authorized/pending can abort the UPI session.
  */
-function respondWaiting(res, { reason, paymentStatus, appName }) {
+const SITE_BASE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://aienter.in').replace(/\/$/, '');
+
+function buildHandoffPaymentRetryUrl(transaction) {
+  if (!transaction?.handoff_token || !transaction?.session_id) return null;
+  const path =
+    transaction.app_name === 'uriq.in'
+      ? '/payments/uriq'
+      : '/payments/iiskills';
+  const url = new URL(`${SITE_BASE}${path}`);
+  url.searchParams.set('token', transaction.handoff_token);
+  url.searchParams.set('purchaseId', transaction.session_id);
+  url.searchParams.set('payment_retry', '1');
+  return url.toString();
+}
+
+function respondWaiting(res, { reason, paymentStatus, appName, retryUrl }) {
   console.log('[razorpay-callback] waiting 200 (no entitlement, no cancel)', {
     reason,
     paymentStatus: paymentStatus || null,
     appName,
+    retryUrl: retryUrl || null,
   });
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
@@ -53,6 +69,9 @@ function respondWaiting(res, { reason, paymentStatus, appName }) {
   const portal = DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
   const portalLabel = portal.replace(/^https?:\/\//, '');
   const statusLine = paymentStatus ? `Payment status: ${paymentStatus}` : reason || 'Waiting for UPI';
+  const retryBlock = retryUrl
+    ? `<p style="margin-top:1.25rem"><a href="${retryUrl}" style="display:inline-block;padding:0.75rem 1rem;background:#4f46e5;color:#fff;text-decoration:none;border-radius:8px;font-weight:600">Return to payment page</a></p>`
+    : '';
   res.end(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Awaiting UPI authorization</title></head>
@@ -60,7 +79,8 @@ function respondWaiting(res, { reason, paymentStatus, appName }) {
 <h1 style="font-size:1.35rem">Awaiting UPI authorization</h1>
 <p style="color:#374151;line-height:1.5">Your payment is not finished yet. Open your UPI app, confirm the amount, and enter your PIN.</p>
 <p style="color:#6b7280;font-size:0.9rem">${statusLine}</p>
-<p style="color:#92400e;font-size:0.85rem;margin-top:1rem">Keep this page open until payment completes. Do not close the tab during UPI.</p>
+<p style="color:#92400e;font-size:0.85rem;margin-top:1rem">If UPI did not open, use the button below and tap <strong>Try payment again</strong> — do not tap Pay while a payment is already in progress.</p>
+${retryBlock}
 <p style="margin-top:1.5rem;font-size:0.85rem;color:#6b7280">After paying, you can visit <a href="${portal}" style="color:#4f46e5">${portalLabel}</a></p>
 </body></html>`);
 }
@@ -212,16 +232,28 @@ async function handleStandardCheckoutCallback(
   res,
   { supabase, razorpay_order_id, razorpay_payment_id, razorpay_signature },
 ) {
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return paymentErrorRedirect(res, 'Missing payment details from Razorpay');
-  }
-
   let transaction = null;
-  if (supabase) {
+  if (supabase && razorpay_order_id) {
     transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
   }
 
   const appName = transaction?.app_name || 'iiskills';
+  const retryUrl = buildHandoffPaymentRetryUrl(transaction);
+
+  // Cancelled UPI / premature redirect — never 303 to error (aborts retry and confuses users).
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    console.log('[razorpay-callback] incomplete standard checkout params', {
+      order_id: razorpay_order_id || null,
+      payment_id: razorpay_payment_id || null,
+      has_signature: Boolean(razorpay_signature),
+    });
+    return respondWaiting(res, {
+      reason: 'Payment was not completed. Return to the payment page and try again.',
+      paymentStatus: 'pending',
+      appName,
+      retryUrl,
+    });
+  }
   const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
 
   if (!keySecret) {
@@ -487,30 +519,42 @@ export default async function handler(req, res) {
     });
   }
 
-  if (
-    req.method === 'GET' &&
-    req.query.razorpay_payment_id &&
-    req.query.razorpay_order_id &&
-    req.query.razorpay_signature
-  ) {
-    return handleStandardCheckoutCallback(res, {
-      supabase,
-      razorpay_order_id: req.query.razorpay_order_id,
-      razorpay_payment_id: req.query.razorpay_payment_id,
-      razorpay_signature: req.query.razorpay_signature,
+  const callbackParams = {
+    razorpay_order_id: req.query?.razorpay_order_id || req.body?.razorpay_order_id,
+    razorpay_payment_id: req.query?.razorpay_payment_id || req.body?.razorpay_payment_id,
+    razorpay_signature: req.query?.razorpay_signature || req.body?.razorpay_signature,
+  };
+
+  const hasStandardCallback =
+    callbackParams.razorpay_order_id ||
+    callbackParams.razorpay_payment_id ||
+    callbackParams.razorpay_signature;
+
+  if (req.method === 'GET' && !hasStandardCallback && !req.query.razorpay_payment_link_id) {
+    console.log('[razorpay-callback] empty GET — cancelled or in-progress UPI');
+    return respondWaiting(res, {
+      reason: 'Payment was not completed. Return to the payment page and try again.',
+      paymentStatus: 'pending',
+      appName: 'iiskills',
     });
+  }
+
+  if (req.method === 'GET' && hasStandardCallback) {
+    return handleStandardCheckoutCallback(res, { supabase, ...callbackParams });
   }
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
+  if (!hasStandardCallback && !req.query.razorpay_payment_link_id) {
+    console.log('[razorpay-callback] empty POST — cancelled or in-progress UPI');
+    return respondWaiting(res, {
+      reason: 'Payment was not completed. Return to the payment page and try again.',
+      paymentStatus: 'pending',
+      appName: 'iiskills',
+    });
+  }
 
-  return handleStandardCheckoutCallback(res, {
-    supabase,
-    razorpay_order_id,
-    razorpay_payment_id,
-    razorpay_signature,
-  });
+  return handleStandardCheckoutCallback(res, { supabase, ...callbackParams });
 }
