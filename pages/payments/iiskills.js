@@ -1,5 +1,6 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
 import { verifyIiskillsToken } from '../../lib/verifyIiskillsToken';
+import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePendingPayment';
 import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
 import {
   BUNDLE_COURSE_SLUG,
@@ -28,8 +29,9 @@ const DIRECT_ACCESS_ERROR = {
 };
 
 export async function getServerSideProps({ query }) {
-  const { purchaseId, token } = query;
+  const { purchaseId, token, payment_retry } = query;
   const isBundlePhase = isIiskillsBundleOfferActive();
+  const paymentRetry = payment_retry === '1';
 
   if (!token) {
     return {
@@ -53,12 +55,20 @@ export async function getServerSideProps({ query }) {
       };
     }
 
+    if (paymentRetry) {
+      await invalidatePendingPaymentTransaction({
+        appName: 'iiskills',
+        sessionId: payload.purchaseId,
+      });
+    }
+
     return {
       props: {
         tokenPayload: payload,
         rawToken: token,
         purchaseId: payload.purchaseId,
         isBundlePhase,
+        paymentRetry,
       },
     };
   } catch (err) {
@@ -75,6 +85,7 @@ export default function IisSkillsPaymentsPage({
   purchaseId,
   tokenError,
   isBundlePhase,
+  paymentRetry,
 }) {
   const selectedCourseLabel = tokenPayload?.courseSlug
     ? COURSE_LABELS[tokenPayload.courseSlug] || tokenPayload.courseSlug
@@ -126,6 +137,7 @@ export default function IisSkillsPaymentsPage({
       paymentCourse={isBundlePhase ? BUNDLE_COURSE_SLUG : undefined}
       displayPrice="₹116.82"
       priceBreakdown="(₹99 + 18% GST)"
+      paymentRetry={paymentRetry}
     />
   );
 }

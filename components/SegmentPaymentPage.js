@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { buildIiskillsRazorpayCallbackUrl } from '../lib/iiskillsCallbackUrl';
 
-// External-token apps (iiskills, uriq): Standard Checkout redirect:true (full Razorpay page).
-// Entitlements run only from /api/payments/razorpay-callback or webhook after capture.
+// External-token apps (iiskills, uriq): Razorpay checkout after Submit only.
+// iiskills browser callback → iiskills.in/api/payments/callback (not aienter).
 // No shared auth cookies — identity is the JWT handoff token stored with the order.
 
 function isMobileCheckout() {
@@ -206,6 +207,7 @@ export default function SegmentPaymentPage({
   paymentCourse,
   displayPrice,
   priceBreakdown,
+  paymentRetry = false,
 }) {
   const router = useRouter();
 
@@ -244,6 +246,45 @@ export default function SegmentPaymentPage({
   const createOrderFiredRef = useRef(false);
   const razorpayOpenedRef = useRef(false);
   const payButtonRef = useRef(null);
+  const graceNotifiedOrderRef = useRef(null);
+
+  const resetCheckoutForRetry = () => {
+    clearCheckoutSession();
+    pendingCheckoutRef.current = null;
+    graceNotifiedOrderRef.current = null;
+    needsFreshOrderRef.current = true;
+    unlockPayButton();
+    setProcessing(false);
+    setAwaitingUpiReturn(false);
+    setPaymentPhase(PAYMENT_PHASE.idle);
+    setStatusText('');
+    setError('');
+    setConfirmRetryPayload(null);
+  };
+
+  const notifyIiskillsProcessing = async (orderId) => {
+    const kind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
+    if (segmentKey !== 'iiskills' || kind !== 'iiskills' || !rawToken || !purchaseId || !orderId) {
+      return;
+    }
+    if (graceNotifiedOrderRef.current === orderId) return;
+    graceNotifiedOrderRef.current = orderId;
+
+    try {
+      await fetch(`${getApiBaseUrl()}/api/payments/notify-pending`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          purchaseId,
+          iiskills_token: rawToken,
+          course,
+        }),
+      });
+    } catch (e) {
+      console.warn('[payment] iiskills pending notify failed:', e);
+    }
+  };
 
   /** Sync ref lock + React state — survives re-renders without double create-order. */
   const lockPayButton = () => {
@@ -264,6 +305,22 @@ export default function SegmentPaymentPage({
   };
 
   useEffect(() => {
+    if (!router.isReady) return;
+
+    const isRetry =
+      paymentRetry ||
+      router.query.payment_retry === '1' ||
+      router.query.payment_retry === 1;
+
+    if (isRetry) {
+      resetCheckoutForRetry();
+      const { payment_retry: _retry, ...restQuery } = router.query;
+      router.replace({ pathname: router.pathname, query: restQuery }, undefined, {
+        shallow: true,
+      });
+      return;
+    }
+
     const session = restoreCheckoutSession();
     if (!session?.orderId) return;
 
@@ -278,7 +335,7 @@ export default function SegmentPaymentPage({
     setAwaitingUpiReturn(true);
     setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
     setStatusText('Payment pending — please check your UPI app');
-  }, [segmentKey]);
+  }, [router.isReady, segmentKey, paymentRetry]);
 
   const openRazorpayOnce = (options) => {
     if (razorpayOpenedRef.current) {
@@ -497,7 +554,14 @@ export default function SegmentPaymentPage({
         return;
       }
 
-      const callbackUrl = `${window.location.origin}/api/payments/razorpay-callback`;
+      const callbackUrl =
+        segmentKey === 'iiskills' && activeTokenKind === 'iiskills' && rawToken
+          ? buildIiskillsRazorpayCallbackUrl({
+              tokenPayload,
+              rawToken,
+              purchaseId,
+            })
+          : `${window.location.origin}/api/payments/razorpay-callback`;
 
       const prefill = {};
       const contactPhone = extractTokenPhone(tokenPayload) || phone.trim();
@@ -555,6 +619,7 @@ export default function SegmentPaymentPage({
         if (!rzp) {
           throw new Error('Payment window is already open. Please complete or cancel it first.');
         }
+        void notifyIiskillsProcessing(createJson.orderId);
         setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
         setStatusText('Payment pending — please check your UPI app');
         leavingForCheckout = true;
@@ -663,6 +728,7 @@ export default function SegmentPaymentPage({
       if (!rzp) {
         throw new Error('Payment window is already open. Please complete or cancel it first.');
       }
+      void notifyIiskillsProcessing(createJson.orderId);
 
       rzp.on('payment.failed', function (resp) {
         if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
@@ -942,7 +1008,9 @@ export default function SegmentPaymentPage({
       default:
         return isInitiating || processing
           ? statusText || 'Processing…'
-          : `Pay ${displayPrice || '₹116.82'}`;
+          : segmentKey === 'iiskills'
+            ? `Submit — ${displayPrice || '₹116.82'}`
+            : `Pay ${displayPrice || '₹116.82'}`;
     }
   })();
 
