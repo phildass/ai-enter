@@ -3,8 +3,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { buildIiskillsRazorpayCallbackUrl } from '../lib/iiskillsCallbackUrl';
 
-// External-token apps (iiskills, uriq): Razorpay checkout after Submit only.
-// iiskills browser callback → iiskills.in/api/payments/callback (not aienter).
+// iiskills: modal checkout (no redirect) — browser callback on authorize kills UPI intent.
+// uriq may use redirect checkout. Capture verified server-side via resume-payment / webhook.
 // No shared auth cookies — identity is the JWT handoff token stored with the order.
 
 function isMobileCheckout() {
@@ -437,7 +437,10 @@ export default function SegmentPaymentPage({
     (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
-  const usesRedirectCheckout = isExternalTokenSegment;
+  // iiskills: modal only — redirect+callback_url aborts UPI on payment.authorized.
+  const usesIiskillsModalCheckout =
+    segmentKey === 'iiskills' && activeTokenKind === 'iiskills' && !!rawToken;
+  const usesRedirectCheckout = isExternalTokenSegment && !usesIiskillsModalCheckout;
 
   // Main pay action — atomic lock prevents duplicate create-order / double UPI intent.
   const handlePay = async () => {
@@ -571,7 +574,7 @@ export default function SegmentPaymentPage({
       }
       if (userEmailFromToken) prefill.email = userEmailFromToken;
 
-      // External-token apps: full-page Razorpay checkout — entitlements via server callback only.
+      // uriq (and legacy): full-page Razorpay redirect checkout.
       if (usesRedirectCheckout) {
         setPaymentPhase(PAYMENT_PHASE.redirectingUpi);
         setStatusText('Redirecting to UPI…');
@@ -619,7 +622,6 @@ export default function SegmentPaymentPage({
         if (!rzp) {
           throw new Error('Payment window is already open. Please complete or cancel it first.');
         }
-        void notifyIiskillsProcessing(createJson.orderId);
         setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
         setStatusText('Payment pending — please check your UPI app');
         leavingForCheckout = true;
@@ -627,9 +629,11 @@ export default function SegmentPaymentPage({
       }
 
       setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
-      setStatusText('Payment pending — please check your UPI app');
+      setStatusText('Open Razorpay and choose UPI to continue…');
 
       const mobileCheckout = isMobileCheckout();
+      // Never redirect iiskills to callback_url on mobile — that cancels UPI intent.
+      const mobileRedirectCheckout = mobileCheckout && !usesIiskillsModalCheckout;
 
       pendingCheckoutRef.current = {
         orderId: createJson.orderId,
@@ -660,11 +664,10 @@ export default function SegmentPaymentPage({
         order_id: createJson.orderId,
         retry: { enabled: false },
         ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
-        ...(mobileCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
+        ...(mobileRedirectCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
         handler: async function (resp) {
-          // Mobile UPI completes via server callback after redirect — ignore JS handler.
-          if (mobileCheckout) return;
+          if (mobileRedirectCheckout) return;
 
           try {
             if (
@@ -679,11 +682,24 @@ export default function SegmentPaymentPage({
               return;
             }
 
+            setPaymentPhase(PAYMENT_PHASE.verifying);
+            setStatusText('Checking payment status…');
+
+            // iiskills: never trust JS handler alone — resume only after server-verified capture.
+            if (usesIiskillsModalCheckout) {
+              const ok = await tryResumePayment();
+              if (!ok) {
+                setAwaitingUpiReturn(true);
+                setPaymentPhase(PAYMENT_PHASE.awaitingUpi);
+                setStatusText('Payment pending — please check your UPI app');
+                setProcessing(false);
+              }
+              return;
+            }
+
             pendingCheckoutRef.current = null;
             clearCheckoutSession();
             setAwaitingUpiReturn(false);
-            setPaymentPhase(PAYMENT_PHASE.verifying);
-            setStatusText('Checking payment status…');
 
             await verifyPayment({
               razorpay_order_id: resp.razorpay_order_id,
@@ -711,6 +727,9 @@ export default function SegmentPaymentPage({
               setStatusText('Payment pending — please check your UPI app');
               setError('');
               setProcessing(false);
+              if (usesIiskillsModalCheckout && pendingCheckoutRef.current?.orderId) {
+                void notifyIiskillsProcessing(pendingCheckoutRef.current.orderId);
+              }
               return;
             }
             clearCheckoutSession();
@@ -728,7 +747,6 @@ export default function SegmentPaymentPage({
       if (!rzp) {
         throw new Error('Payment window is already open. Please complete or cancel it first.');
       }
-      void notifyIiskillsProcessing(createJson.orderId);
 
       rzp.on('payment.failed', function (resp) {
         if (pendingCheckoutRef.current && isLikelyUpiTransitionFailure(resp)) {
@@ -737,6 +755,9 @@ export default function SegmentPaymentPage({
           setStatusText('Payment pending — please check your UPI app');
           setError('');
           setProcessing(false);
+          if (usesIiskillsModalCheckout && pendingCheckoutRef.current?.orderId) {
+            void notifyIiskillsProcessing(pendingCheckoutRef.current.orderId);
+          }
           return;
         }
 
@@ -757,7 +778,7 @@ export default function SegmentPaymentPage({
         setStatusText('');
       });
 
-      if (mobileCheckout) {
+      if (mobileRedirectCheckout) {
         leavingForCheckout = true;
       }
       return;
@@ -997,8 +1018,6 @@ export default function SegmentPaymentPage({
     switch (paymentPhase) {
       case PAYMENT_PHASE.initiating:
         return statusText || 'Creating order…';
-      case PAYMENT_PHASE.redirectingUpi:
-        return 'Redirecting to UPI…';
       case PAYMENT_PHASE.awaitingUpi:
         return 'Awaiting UPI authorization…';
       case PAYMENT_PHASE.verifying:
