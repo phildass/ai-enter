@@ -214,11 +214,13 @@ export default function SegmentPaymentPage({
   const pendingCheckoutRef = useRef(null);
   const resumeInFlightRef = useRef(false);
   const paymentInFlightRef = useRef(false);
+  const createOrderFiredRef = useRef(false);
   const razorpayOpenedRef = useRef(false);
   const payButtonRef = useRef(null);
 
+  /** Sync ref lock + React state — survives re-renders without double create-order. */
   const lockPayButton = () => {
-    if (paymentInFlightRef.current || isInitiating) return false;
+    if (paymentInFlightRef.current) return false;
     paymentInFlightRef.current = true;
     setIsInitiating(true);
     if (payButtonRef.current) {
@@ -229,6 +231,7 @@ export default function SegmentPaymentPage({
 
   const unlockPayButton = () => {
     paymentInFlightRef.current = false;
+    createOrderFiredRef.current = false;
     razorpayOpenedRef.current = false;
     setIsInitiating(false);
   };
@@ -346,6 +349,12 @@ export default function SegmentPaymentPage({
       console.log('[payment] handlePay blocked — pay lock already held');
       return;
     }
+
+    if (createOrderFiredRef.current) {
+      console.log('[payment] handlePay blocked — create-order already fired');
+      return;
+    }
+    createOrderFiredRef.current = true;
 
     setProcessing(true);
     setStatusText('Creating order…');
@@ -805,13 +814,15 @@ export default function SegmentPaymentPage({
     );
   }
 
-  // Basic page shell (kept consistent with your existing UI approach)
+  // Validation gates + atomic isInitiating lock (set synchronously on first Pay click).
   const disablePay =
     isInitiating ||
     processing ||
     !courseAllowed ||
     (needsPhoneInput && !PHONE_RE.test(phone.trim())) ||
     (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
+
+  const payButtonDisabled = disablePay || isInitiating;
 
   return (
     <>
@@ -1069,20 +1080,20 @@ export default function SegmentPaymentPage({
             ref={payButtonRef}
             type="button"
             onClick={handlePay}
-            disabled={disablePay}
+            disabled={payButtonDisabled}
             aria-busy={isInitiating || processing}
-            aria-disabled={disablePay}
+            aria-disabled={payButtonDisabled}
             style={{
               width: '100%',
               padding: '1rem',
               borderRadius: 12,
               border: 'none',
-              background: processing ? accentDisabled : accentColor,
+              background: isInitiating || processing ? accentDisabled : accentColor,
               color: 'white',
               fontSize: '1.05rem',
               fontWeight: 700,
-              cursor: disablePay ? 'not-allowed' : 'pointer',
-              pointerEvents: disablePay ? 'none' : 'auto',
+              cursor: payButtonDisabled ? 'not-allowed' : 'pointer',
+              pointerEvents: payButtonDisabled ? 'none' : 'auto',
               transition: '0.2s',
               marginBottom: '0.75rem',
             }}

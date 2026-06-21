@@ -7,6 +7,7 @@ import { verifyPaymentLinkCallbackSignature } from '../../../lib/razorpayPayment
 import {
   assertPaymentCaptured,
   checkoutCooldownRemainingMs,
+  isNonCapturedPaymentStatus,
   isWithinCheckoutCooldown,
 } from '../../../lib/razorpayCapture';
 
@@ -282,8 +283,9 @@ async function handleStandardCheckoutCallback(
 }
 
 /**
- * Razorpay redirect callback — entitlements only after API-verified captured status.
- * No Supabase auth cookies; payment identity is JWT handoff_token in payment_transactions.
+ * Razorpay redirect callback (Pages API equivalent of /api/payments/callback/route.ts).
+ * Entitlements ONLY when Razorpay payment.status === 'captured' (verified via API).
+ * authorized / pending / created → HTTP 200 waiting page, no confirm, no cancel.
  */
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -297,6 +299,34 @@ export default async function handler(req, res) {
       body: req.body || {},
     }),
   );
+
+  // Webhook-style POST misrouted here — only payment.captured may grant access.
+  const webhookEvent = req.body?.event;
+  if (webhookEvent && webhookEvent !== 'payment.captured') {
+    console.log(
+      `[razorpay-callback] ignored non-captured event=${webhookEvent} (waiting for payment.captured)`,
+    );
+    return respondWaiting(res, {
+      reason: `Awaiting payment.captured (got ${webhookEvent})`,
+      paymentStatus: 'pending',
+      appName: 'iiskills',
+    });
+  }
+
+  const inlineStatus =
+    req.query?.razorpay_payment_status ||
+    req.body?.razorpay_payment_status ||
+    req.body?.payload?.payment?.entity?.status;
+  if (inlineStatus && isNonCapturedPaymentStatus(inlineStatus)) {
+    console.log(
+      `[razorpay-callback] ignored non-captured inline status=${inlineStatus}`,
+    );
+    return respondWaiting(res, {
+      reason: 'Payment not captured yet',
+      paymentStatus: inlineStatus,
+      appName: 'iiskills',
+    });
+  }
 
   const orderId = req.query?.razorpay_order_id || req.body?.razorpay_order_id;
   const paymentId = req.query?.razorpay_payment_id || req.body?.razorpay_payment_id;
