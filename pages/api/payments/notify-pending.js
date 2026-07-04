@@ -1,5 +1,4 @@
 import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
-import { verifyUriqToken } from '../../../lib/verifyUriqToken';
 import { callIiskillsPending } from '../../../lib/callIiskillsPending';
 import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
 
@@ -12,14 +11,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { order_id, purchaseId, iiskills_token, uriq_token, course, app_name } = req.body || {};
+  const { order_id, purchaseId, iiskills_token, course } = req.body || {};
 
   if (!order_id) {
     return res.status(400).json({ error: 'Missing order_id' });
-  }
-
-  if (uriq_token) {
-    return res.status(200).json({ ok: true, skipped: true, reason: 'uriq_not_supported' });
   }
 
   if (!iiskills_token) {

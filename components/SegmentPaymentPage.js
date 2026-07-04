@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { buildIiskillsRazorpayCallbackUrl } from '../lib/iiskillsCallbackUrl';
 
 // iiskills: modal checkout (no redirect) — browser callback on authorize kills UPI intent.
-// uriq may use redirect checkout. Capture verified server-side via resume-payment / webhook.
+// Capture verified server-side via resume-payment / webhook.
 // No shared auth cookies — identity is the JWT handoff token stored with the order.
 
 function isMobileCheckout() {
@@ -106,12 +106,9 @@ function fetchWithTimeout(url, options) {
 }
 
 const COURSE_LABELS = {
-  'learn-ai': 'Learn AI',
-  'learn-developer': 'Learn Developer',
-  'learn-pr': 'Learn PR',
-  'learn-management': 'Learn Management',
-  'skills-passport': 'Skills Passport',
-  'all-courses-bundle': 'All Courses (5 Paid Apps)',
+  'exam-topper-bundle': 'Entrance Exams + Topper Bundle',
+  'entrance-exams': 'Entrance Exams',
+  'topper': 'Topper',
 };
 
 const PHONE_RE = /^\d{10}$/;
@@ -171,10 +168,7 @@ function clearCheckoutSession() {
   }
 }
 
-const DASHBOARD_URLS = {
-  iiskills: 'https://iiskills.in/dashboard',
-  'uriq.in': 'https://uriq.in/dashboard',
-};
+const DASHBOARD_URL = 'https://iiskills.in/dashboard';
 
 function finishPaymentRedirect(redirect, sessionId) {
   const join = redirect.includes('?') ? '&' : '?';
@@ -217,7 +211,7 @@ export default function SegmentPaymentPage({
   const userId = tokenPayload ? userIdFromToken : router.query.user_id;
   const userEmail = tokenPayload ? userEmailFromToken : router.query.email;
 
-  // purchaseId may be in the URL (?purchaseId=) or embedded in the JWT (iiskills/uriq).
+  // purchaseId may be in the URL (?purchaseId=) or embedded in the JWT.
   const purchaseId =
     (router.isReady ? router.query.purchaseId : undefined) || tokenPayload?.purchaseId;
   const courseFromQuery = router.isReady ? router.query.course : undefined;
@@ -375,9 +369,7 @@ export default function SegmentPaymentPage({
         app_name: pending.segmentKey,
       };
 
-      if (pending.activeTokenKind === 'uriq') {
-        body.uriq_token = pending.rawToken;
-      } else if (pending.activeTokenKind === 'iiskills') {
+      if (pending.activeTokenKind === 'iiskills') {
         body.iiskills_token = pending.rawToken;
       }
 
@@ -428,6 +420,13 @@ export default function SegmentPaymentPage({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  useEffect(() => {
+    if (!tokenPayload) return;
+    const tokenPhone = extractTokenPhone(tokenPayload);
+    if (tokenPhone && !phone) {
+      setPhone(tokenPhone);
+    }
+  }, [tokenPayload, phone]);
 
   const canSubmitCustomerDetails = useMemo(() => {
     if (!allowedCourses) return true;
@@ -440,7 +439,7 @@ export default function SegmentPaymentPage({
 
   const activeTokenKind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
   const isExternalTokenSegment =
-    (activeTokenKind === 'iiskills' || activeTokenKind === 'uriq') && !!rawToken;
+    activeTokenKind === 'iiskills' && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
   const isIiskillsHandoff =
@@ -505,15 +504,12 @@ export default function SegmentPaymentPage({
 
       if (isExternalTokenSegment) {
         if (!purchaseId) throw new Error('Invalid payment link. Missing purchaseId.');
-        body =
-          activeTokenKind === 'uriq'
-            ? { uriq_token: rawToken, purchaseId }
-            : {
-                iiskills_token: rawToken,
-                purchaseId,
-                ...(course ? { course } : {}),
-                ...(phone.trim() ? { customer_phone: phone.trim() } : {}),
-              };
+        body = {
+          iiskills_token: rawToken,
+          purchaseId,
+          ...(course ? { course } : {}),
+          ...(phone.trim() ? { customer_phone: phone.trim() } : {}),
+        };
       } else {
         body = rawToken
           ? {
@@ -602,7 +598,7 @@ export default function SegmentPaymentPage({
       }
       if (userEmailFromToken) prefill.email = userEmailFromToken;
 
-      // uriq (and legacy): full-page Razorpay redirect checkout.
+      // Full-page Razorpay redirect checkout (mobile UPI).
       if (usesRedirectCheckout) {
         setPaymentPhase(PAYMENT_PHASE.redirectingUpi);
         setStatusText('Redirecting to UPI…');
@@ -849,23 +845,14 @@ export default function SegmentPaymentPage({
         setStatusText('');
         return;
       }
-      body =
-        activeTokenKind === 'uriq' ?
-          {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            uriq_token: rawToken,
-            purchaseId,
-          }
-        : {
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature,
-            iiskills_token: rawToken,
-            purchaseId,
-            ...(course ? { course } : {}),
-          };
+      body = {
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature,
+        iiskills_token: rawToken,
+        purchaseId,
+        ...(course ? { course } : {}),
+      };
     } else {
       body = rawToken
         ? {
@@ -948,7 +935,7 @@ export default function SegmentPaymentPage({
         json.redirect_url ||
         json.return_url ||
         (orderData && orderData.return_url) ||
-        DASHBOARD_URLS[segmentKey];
+        DASHBOARD_URL;
 
       if (redirect) {
         finishPaymentRedirect(redirect, json.session_id || (orderData && orderData.session_id));

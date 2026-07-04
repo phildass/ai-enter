@@ -4,10 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
 import { getRazorpayCredentialsForApp } from '../../../lib/payments';
 
-const DEFAULT_REDIRECTS = {
-  iiskills: 'https://iiskills.in/dashboard',
-  'uriq.in': 'https://uriq.in/dashboard',
-};
+const DEFAULT_REDIRECT = 'https://iiskills.in/dashboard';
 
 /**
  * Mobile UPI recovery: when the user returns from GPay/PhonePe but Razorpay
@@ -22,7 +19,6 @@ export default async function handler(req, res) {
     order_id,
     purchaseId,
     iiskills_token,
-    uriq_token,
     course,
     app_name: bodyAppName,
   } = req.body || {};
@@ -50,7 +46,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const appName = transaction?.app_name || bodyAppName || (iiskills_token ? 'iiskills' : uriq_token ? 'uriq.in' : null);
+  const appName = transaction?.app_name || bodyAppName || (iiskills_token ? 'iiskills' : null);
 
   if (transaction?.status === 'success') {
     return res.status(200).json({
@@ -59,7 +55,7 @@ export default async function handler(req, res) {
       captured: true,
       payment_status: 'captured',
       redirect_url:
-        transaction.return_url || DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills,
+        transaction.return_url || DEFAULT_REDIRECT,
     });
   }
 
@@ -114,11 +110,7 @@ export default async function handler(req, res) {
     .update(`${order_id}|${razorpay_payment_id}`)
     .digest('hex');
 
-  const token =
-    iiskills_token ||
-    uriq_token ||
-    transaction?.handoff_token ||
-    null;
+  const token = iiskills_token || transaction?.handoff_token || null;
 
   try {
     const result = await completeVerifiedPayment({
@@ -127,8 +119,7 @@ export default async function handler(req, res) {
       razorpay_signature,
       purchaseId: purchaseId || transaction?.session_id,
       course: course || transaction?.course,
-      iiskills_token: appName === 'iiskills' ? token : undefined,
-      uriq_token: appName === 'uriq.in' ? token : undefined,
+      iiskills_token: token || undefined,
       app_name: appName,
       entitlement_source: 'resume',
     });
@@ -145,7 +136,7 @@ export default async function handler(req, res) {
         payment_status: 'captured',
         confirmFailed: true,
         confirmError: result.confirmError,
-        redirect_url: result.redirect_url || DEFAULT_REDIRECTS[appName],
+        redirect_url: result.redirect_url || DEFAULT_REDIRECT,
       });
     }
 
@@ -157,8 +148,7 @@ export default async function handler(req, res) {
       redirect_url:
         result.redirect_url ||
         transaction?.return_url ||
-        DEFAULT_REDIRECTS[appName] ||
-        DEFAULT_REDIRECTS.iiskills,
+        DEFAULT_REDIRECT,
     });
   } catch (err) {
     console.error('[resume-payment] completeVerifiedPayment error:', err);

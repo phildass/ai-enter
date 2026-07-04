@@ -58,7 +58,7 @@ ai-enter/
 │   │   ├── jaikisan.js                  # jai-kisan payment page
 │   │   ├── iisacademy.js                # iisacademy payment page
 │   │   ├── iisacademy2.js               # iisacademy variant 2
-│   │   ├── uriq.js                      # uriq payment page
+│   │   └── (iiskills only)
 │   │   ├── jaibharatpay.js              # jai-bharat payment flow
 │   │   ├── jaikisanpay.js               # jai-kisan payment flow
 │   │   └── success.js                   # Payment success page (auto-redirects)
@@ -73,7 +73,7 @@ ai-enter/
 │   └── _app.js                          # Next.js App wrapper
 ├── lib/
 │   ├── verifyIiskillsToken.js           # JWT verification for iiskills tokens
-│   ├── verifyUriqToken.js               # Token verification for uriq
+│   └── (uriq removed)
 │   ├── verifyHandoffToken.js            # Token verification for origin sites
 │   ├── handoff.js                       # Webhook signing utilities
 │   ├── courses.js                       # Course data & pricing logic

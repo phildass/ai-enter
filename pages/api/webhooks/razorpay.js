@@ -167,8 +167,7 @@ export default async function handler(req, res) {
       razorpay_signature,
       purchaseId: transaction?.session_id,
       course: transaction?.course,
-      iiskills_token: appName === 'iiskills' ? transaction?.handoff_token : undefined,
-      uriq_token: appName === 'uriq.in' ? transaction?.handoff_token : undefined,
+      iiskills_token: transaction?.handoff_token || undefined,
       app_name: appName,
       entitlement_source: 'webhook',
     });

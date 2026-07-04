@@ -11,10 +11,7 @@ import {
   isWithinCheckoutCooldown,
 } from '../../../lib/razorpayCapture';
 
-const DEFAULT_REDIRECTS = {
-  iiskills: 'https://iiskills.in/dashboard',
-  'uriq.in': 'https://uriq.in/dashboard',
-};
+const DEFAULT_REDIRECT = 'https://iiskills.in/dashboard';
 
 const TX_SELECT =
   'app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id, razorpay_payment_id, created_at, updated_at';
@@ -45,10 +42,7 @@ const SITE_BASE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://aienter.in').rep
 
 function buildHandoffPaymentRetryUrl(transaction) {
   if (!transaction?.handoff_token || !transaction?.session_id) return null;
-  const path =
-    transaction.app_name === 'uriq.in'
-      ? '/payments/uriq'
-      : '/payments/iiskills';
+  const path = '/payments/iiskills';
   const url = new URL(`${SITE_BASE}${path}`);
   url.searchParams.set('token', transaction.handoff_token);
   url.searchParams.set('purchaseId', transaction.session_id);
@@ -66,7 +60,7 @@ function respondWaiting(res, { reason, paymentStatus, appName, retryUrl }) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.statusCode = 200;
-  const portal = DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
+  const portal = DEFAULT_REDIRECT;
   const portalLabel = portal.replace(/^https?:\/\//, '');
   const statusLine = paymentStatus ? `Payment status: ${paymentStatus}` : reason || 'Waiting for UPI';
   const retryBlock = retryUrl
@@ -177,7 +171,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
     }
 
     const doneUrl =
-      transaction.return_url || DEFAULT_REDIRECTS[appName] || DEFAULT_REDIRECTS.iiskills;
+      transaction.return_url || DEFAULT_REDIRECT;
     return redirect(res, doneUrl);
   }
 
@@ -190,8 +184,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
       ...paymentParams,
       purchaseId,
       course: transaction?.course,
-      iiskills_token: appName === 'iiskills' ? handoffToken : undefined,
-      uriq_token: appName === 'uriq.in' ? handoffToken : undefined,
+      iiskills_token: handoffToken || undefined,
       app_name: appName,
       entitlement_source: 'callback',
     });
@@ -222,8 +215,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
   const destination =
     result.redirect_url ||
     transaction?.return_url ||
-    DEFAULT_REDIRECTS[appName] ||
-    DEFAULT_REDIRECTS.iiskills;
+    DEFAULT_REDIRECT;
 
   return redirect(res, destination);
 }

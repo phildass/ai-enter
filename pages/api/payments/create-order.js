@@ -106,7 +106,7 @@ export default async function handler(req, res) {
   try {
     if (!isSupportedPaymentApp(app_name)) {
       return res.status(400).json({
-        error: 'Unsupported payment app. Only iiskills and uriq.in are allowed.',
+        error: 'Unsupported payment app. Only iiskills is supported.',
       });
     }
 

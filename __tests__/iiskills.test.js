@@ -50,7 +50,7 @@ function buildJwt(payload, secret) {
 
   const payload = {
     purchaseId: 'purchase-123',
-    appId: 'learn-ai',
+    appId: 'exam-topper-bundle',
     amountPaise: DEFAULT_AMOUNT_PAISE,
     razorpayOrderId: 'order_abc',
     razorpayPaymentId: 'pay_xyz',
@@ -104,7 +104,7 @@ function buildJwt(payload, secret) {
 
   const confirmPayload = {
     purchaseId: 'purchase-123',
-    appId: 'learn-ai',
+    appId: 'exam-topper-bundle',
     amountPaise: DEFAULT_AMOUNT_PAISE,
     razorpayOrderId: 'order_abc',
     razorpayPaymentId: 'pay_xyz',
@@ -160,7 +160,7 @@ function buildJwt(payload, secret) {
     user_id: 'user-789',
     phone: '9876543210',
     name: 'Test User',
-    course_slug: 'learn-ai',
+    course_slug: 'exam-topper-bundle',
     return_to: 'https://iiskills.in/payment-success',
     exp: nowSec + 3600,
   };
@@ -201,7 +201,7 @@ function buildJwt(payload, secret) {
   const badToken = buildJwt(badCoursePayload, secret);
   const badParts = badToken.split('.');
   const badDecoded = JSON.parse(Buffer.from(badParts[1], 'base64url').toString('utf8'));
-  const ALLOWED_COURSES = ['learn-ai', 'learn-developer', 'learn-pr', 'learn-management'];
+  const ALLOWED_COURSES = ['exam-topper-bundle', 'entrance-exams', 'topper'];
   assert.ok(
     !ALLOWED_COURSES.includes(badDecoded.course_slug),
     'Unknown course slug should not be in allowed list',
