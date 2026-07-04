@@ -4,17 +4,28 @@ import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePending
 import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
 import { BUNDLE_COURSE_SLUG } from '../../lib/iiskillsOffer';
 
-const DIRECT_ACCESS_ERROR = {
-  title: '⚠️ Direct Access Not Allowed',
+const NO_TOKEN_ERROR = {
+  title: 'Payment Link Required',
   lines: [
-    'Payments are only accepted from official AI Cloud Enterprises portals.',
-    'For iiskills payments, please visit:',
-    'If you were redirected here by iiskills.in, please try again or contact support.',
-    'This security measure protects your payment information.',
+    'This page can only be accessed from iiskills.in.',
+    'Please click "Pay" on your iiskills dashboard to start the payment process.',
   ],
-  portalUrl: 'https://iiskills.in',
-  portalLabel: '🔗 https://iiskills.in',
+  portalUrl: 'https://iiskills.in/dashboard',
+  portalLabel: 'Go to iiskills.in Dashboard',
 };
+
+function makeTokenVerificationError(reason) {
+  return {
+    title: 'Payment Link Expired or Invalid',
+    lines: [
+      'Your payment link could not be verified.',
+      `Reason: ${reason}`,
+      'Please go back to iiskills.in and click "Pay" again to get a fresh link.',
+    ],
+    portalUrl: 'https://iiskills.in/dashboard',
+    portalLabel: 'Go to iiskills.in Dashboard',
+  };
+}
 
 export async function getServerSideProps({ query }) {
   const { purchaseId, token, payment_retry } = query;
@@ -22,7 +33,7 @@ export async function getServerSideProps({ query }) {
 
   if (!token) {
     return {
-      props: { tokenError: DIRECT_ACCESS_ERROR },
+      props: { tokenError: NO_TOKEN_ERROR },
     };
   }
 
@@ -30,7 +41,8 @@ export async function getServerSideProps({ query }) {
     const payload = verifyIiskillsToken(token, { expectedPurchaseId: purchaseId });
 
     if (!IISKILLS_ALLOWED_COURSES.includes(payload.courseSlug)) {
-      return { props: { tokenError: 'Course not available for purchase.' } };
+      console.error('[iiskills-payments] Course not in allowed list:', payload.courseSlug);
+      return { props: { tokenError: makeTokenVerificationError(`Course "${payload.courseSlug}" is not available.`) } };
     }
 
     if (paymentRetry) {
@@ -50,8 +62,17 @@ export async function getServerSideProps({ query }) {
     };
   } catch (err) {
     console.error('[iiskills-payments] Token verification failed:', err.message);
+
+    const reason = /expire/i.test(err.message)
+      ? 'The payment link has expired. Please get a new one.'
+      : /signature/i.test(err.message)
+        ? 'Security verification failed. The server configuration may need updating.'
+        : /secret|configured/i.test(err.message)
+          ? 'Payment server is not properly configured. Please contact support.'
+          : err.message || 'Unknown verification error.';
+
     return {
-      props: { tokenError: DIRECT_ACCESS_ERROR },
+      props: { tokenError: makeTokenVerificationError(reason) },
     };
   }
 }
