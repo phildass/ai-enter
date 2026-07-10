@@ -208,10 +208,15 @@ export default function SegmentPaymentPage({
   const router = useRouter();
 
   const userIdFromToken = tokenPayload ? tokenPayload.user_id : undefined;
-  const userEmailFromToken = tokenPayload ? tokenPayload.user_email : undefined;
+  // iiskills JWTs use `email`; older handoffs use `user_email`. Never invent/fallback by name.
+  const userEmailFromToken = tokenPayload
+    ? (tokenPayload.user_email || tokenPayload.email || undefined)
+    : undefined;
 
   const userId = tokenPayload ? userIdFromToken : router.query.user_id;
-  const userEmail = tokenPayload ? userEmailFromToken : router.query.email;
+  const userEmail = tokenPayload
+    ? userEmailFromToken
+    : (typeof router.query.email === 'string' ? router.query.email : undefined);
 
   // purchaseId may be in the URL (?purchaseId=) or embedded in the JWT.
   const purchaseId =
@@ -598,7 +603,11 @@ export default function SegmentPaymentPage({
       if (tokenPayload?.name || tokenPayload?.customer_name) {
         prefill.name = tokenPayload.name || tokenPayload.customer_name;
       }
-      if (userEmailFromToken) prefill.email = userEmailFromToken;
+      // Receipt email must be this payment session's email only — never leave blank
+      // (blank lets Razorpay/browser autofill another account, e.g. merchant email).
+      const sessionEmail = (userEmailFromToken || userEmail || '').trim();
+      if (sessionEmail) prefill.email = sessionEmail;
+      const readonlyPrefill = sessionEmail ? { email: true } : undefined;
 
       // Full-page Razorpay redirect checkout (mobile UPI).
       if (usesRedirectCheckout) {
@@ -641,6 +650,7 @@ export default function SegmentPaymentPage({
           redirect: true,
           retry: { enabled: false },
           ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+          ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
           ...(isIiskillsHandoff && isMobileCheckout()
             ? {
                 config: {
@@ -706,6 +716,7 @@ export default function SegmentPaymentPage({
         order_id: createJson.orderId,
         retry: { enabled: false },
         ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
+        ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
         ...(mobileRedirectCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
         ...(!usesIiskillsModalCheckout

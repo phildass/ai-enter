@@ -46,6 +46,13 @@ export default async function handler(req, res) {
     app_name = 'iiskills';
     course = resolveIiskillsCourseSlug(req.body.course || payload.courseSlug);
 
+    if (!user_email || typeof user_email !== 'string' || !user_email.includes('@')) {
+      return res.status(400).json({
+        error: 'Payment token is missing the payer email. Please restart checkout from iiskills.',
+      });
+    }
+    user_email = user_email.trim().toLowerCase();
+
     if (!IISKILLS_ALLOWED_COURSES.includes(course)) {
       return res.status(400).json({ error: `Invalid course in token: ${course}` });
     }
