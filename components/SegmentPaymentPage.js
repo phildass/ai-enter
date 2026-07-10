@@ -110,6 +110,7 @@ const COURSE_LABELS = {
   'entrance-exams': 'Entrance Exams',
   'topper': 'Topper',
   'astro': 'Astro',
+  'astro-question': 'Astro AI Astrologer — 1 Question',
 };
 
 const PHONE_RE = /^\d{10}$/;
