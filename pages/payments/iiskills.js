@@ -87,6 +87,7 @@ export default function IisSkillsPaymentsPage({
   const bundleFeatures = [
     'Full Entrance Exams app access',
     'Full Topper app access',
+    'Astro detailed Kundli + AI Astrologer',
     'Exam-oriented content and analytics',
     'No recurring monthly fees',
   ];
@@ -103,15 +104,15 @@ export default function IisSkillsPaymentsPage({
       accentColor="#667eea"
       accentDisabled="#a5b4fc"
       validityText="1 Year"
-      validityLabel="Entrance Exams + Topper Bundle"
+      validityLabel="Entrance Exams + Topper + Astro Bundle"
       features={bundleFeatures}
       originDomain="iiskills.in"
-      description="Entrance Exams + Topper — 1-Year Access"
+      description="Entrance Exams + Topper + Astro — 1-Year Access"
       tokenKind="iiskills"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}
       tokenError={tokenError || null}
-      fixedCourseLabel="Entrance Exams + Topper Bundle"
+      fixedCourseLabel="Entrance Exams + Topper + Astro Bundle"
       paymentCourse={BUNDLE_COURSE_SLUG}
       displayPrice="₹116.82"
       priceBreakdown="(₹99 + 18% GST)"

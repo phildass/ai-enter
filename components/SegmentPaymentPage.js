@@ -106,9 +106,10 @@ function fetchWithTimeout(url, options) {
 }
 
 const COURSE_LABELS = {
-  'exam-topper-bundle': 'Entrance Exams + Topper Bundle',
+  'exam-topper-bundle': 'Entrance Exams + Topper + Astro Bundle',
   'entrance-exams': 'Entrance Exams',
   'topper': 'Topper',
+  'astro': 'Astro',
 };
 
 const PHONE_RE = /^\d{10}$/;
