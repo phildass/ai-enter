@@ -116,7 +116,7 @@ export default async function handler(req, res) {
     .eq('razorpay_order_id', razorpay_order_id)
     .maybeSingle();
 
-  const appName = transaction?.app_name || paymentEntity?.notes?.app_name || 'iiskills';
+  const appName = transaction?.app_name || paymentEntity?.notes?.app_name || 'appmall';
   const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
 
   if (!keySecret) {
@@ -167,7 +167,7 @@ export default async function handler(req, res) {
       razorpay_signature,
       purchaseId: transaction?.session_id,
       course: transaction?.course,
-      iiskills_token: transaction?.handoff_token || undefined,
+      appmall_token: transaction?.handoff_token || undefined,
       app_name: appName,
       entitlement_source: 'webhook',
     });

@@ -3,13 +3,13 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 const appDetails = {
-  name: 'iiskills',
+  name: 'appmall',
   bgColor: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
   cardBg: '#ede9fe',
   titleColor: '#4c1d95',
   accentColor: '#7c3aed',
   validity: '1 year',
-  dashboardUrl: 'https://iiskills.in/dashboard',
+  dashboardUrl: 'https://appmall.in/dashboard',
 };
 
 export default function PaymentSuccess() {
@@ -110,7 +110,7 @@ export default function PaymentSuccess() {
               Next step: access your course
             </p>
             <p style={{ fontSize: '0.8rem', color: '#374151' }}>
-              Your iiskills access is being activated. Redirecting to your dashboard in 3 seconds…
+              Your appmall access is being activated. Redirecting to your dashboard in 3 seconds…
             </p>
           </div>
           )}
@@ -148,7 +148,7 @@ export default function PaymentSuccess() {
 
           {hasError && (
           <a
-            href="https://iiskills.in"
+            href="https://appmall.in"
             style={{
               display: 'inline-block',
               width: '100%',
@@ -164,7 +164,7 @@ export default function PaymentSuccess() {
               textDecoration: 'none',
             }}
           >
-            Return to iiskills.in to try again
+            Return to appmall.in to try again
           </a>
           )}
 
@@ -186,12 +186,12 @@ export default function PaymentSuccess() {
               textDecoration: 'none',
             }}
           >
-            Go to iiskills.in
+            Go to appmall.in
           </a>
           )}
 
           <p style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-            If you have any issues, contact: support@iiskills.in
+            If you have any issues, contact: support@appmall.in
           </p>
         </div>
       </div>

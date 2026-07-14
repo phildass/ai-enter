@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { buildIiskillsRazorpayCallbackUrl } from '../lib/iiskillsCallbackUrl';
+import { buildAppmallRazorpayCallbackUrl } from '../lib/appmallCallbackUrl';
 
-// iiskills: modal checkout (no redirect) — browser callback on authorize kills UPI intent.
+// appmall: modal checkout (no redirect) — browser callback on authorize kills UPI intent.
 // Capture verified server-side via resume-payment / webhook.
 // No shared auth cookies — identity is the JWT handoff token stored with the order.
 
@@ -170,7 +170,7 @@ function clearCheckoutSession() {
   }
 }
 
-const DASHBOARD_URL = 'https://iiskills.in/dashboard';
+const DASHBOARD_URL = 'https://appmall.in/dashboard';
 
 function finishPaymentRedirect(redirect, sessionId) {
   const join = redirect.includes('?') ? '&' : '?';
@@ -208,7 +208,7 @@ export default function SegmentPaymentPage({
   const router = useRouter();
 
   const userIdFromToken = tokenPayload ? tokenPayload.user_id : undefined;
-  // iiskills JWTs use `email`; older handoffs use `user_email`. Never invent/fallback by name.
+  // appmall JWTs use `email`; older handoffs use `user_email`. Never invent/fallback by name.
   const userEmailFromToken = tokenPayload
     ? (tokenPayload.user_email || tokenPayload.email || undefined)
     : undefined;
@@ -266,9 +266,9 @@ export default function SegmentPaymentPage({
     setConfirmRetryPayload(null);
   };
 
-  const notifyIiskillsProcessing = async (orderId) => {
-    const kind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
-    if (segmentKey !== 'iiskills' || kind !== 'iiskills' || !rawToken || !purchaseId || !orderId) {
+  const notifyAppmallProcessing = async (orderId) => {
+    const kind = tokenKind || (segmentKey === 'appmall' ? 'appmall' : 'session');
+    if (segmentKey !== 'appmall' || kind !== 'appmall' || !rawToken || !purchaseId || !orderId) {
       return;
     }
     if (graceNotifiedOrderRef.current === orderId) return;
@@ -281,12 +281,12 @@ export default function SegmentPaymentPage({
         body: JSON.stringify({
           order_id: orderId,
           purchaseId,
-          iiskills_token: rawToken,
+          appmall_token: rawToken,
           course,
         }),
       });
     } catch (e) {
-      console.warn('[payment] iiskills pending notify failed:', e);
+      console.warn('[payment] appmall pending notify failed:', e);
     }
   };
 
@@ -376,8 +376,8 @@ export default function SegmentPaymentPage({
         app_name: pending.segmentKey,
       };
 
-      if (pending.activeTokenKind === 'iiskills') {
-        body.iiskills_token = pending.rawToken;
+      if (pending.activeTokenKind === 'appmall') {
+        body.appmall_token = pending.rawToken;
       }
 
       const res = await fetchWithTimeout(`${getApiBaseUrl()}/api/payments/resume-payment`, {
@@ -423,7 +423,7 @@ export default function SegmentPaymentPage({
     }
   };
 
-  // Customer details (used on iiskills page)
+  // Customer details (used on appmall page)
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -444,17 +444,17 @@ export default function SegmentPaymentPage({
     );
   }, [allowedCourses, firstName, lastName, phone]);
 
-  const activeTokenKind = tokenKind || (segmentKey === 'iiskills' ? 'iiskills' : 'session');
+  const activeTokenKind = tokenKind || (segmentKey === 'appmall' ? 'appmall' : 'session');
   const isExternalTokenSegment =
-    activeTokenKind === 'iiskills' && !!rawToken;
+    activeTokenKind === 'appmall' && !!rawToken;
   const tokenPhone = extractTokenPhone(tokenPayload);
-  const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'iiskills' && !tokenPhone;
-  const isIiskillsHandoff =
-    segmentKey === 'iiskills' && activeTokenKind === 'iiskills' && !!rawToken;
+  const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'appmall' && !tokenPhone;
+  const isAppmallHandoff =
+    segmentKey === 'appmall' && activeTokenKind === 'appmall' && !!rawToken;
   // Mobile UPI intent: modal closes when the UPI app opens and Razorpay cancels the payment.
   // Use full-page redirect + aienter callback (200 on authorize). Desktop keeps modal + QR UPI.
-  const usesIiskillsModalCheckout = isIiskillsHandoff && !isMobileCheckout();
-  const usesRedirectCheckout = isExternalTokenSegment && !usesIiskillsModalCheckout;
+  const usesAppmallModalCheckout = isAppmallHandoff && !isMobileCheckout();
+  const usesRedirectCheckout = isExternalTokenSegment && !usesAppmallModalCheckout;
 
   const tryPaymentAgain = () => {
     if (!router.isReady) return;
@@ -512,7 +512,7 @@ export default function SegmentPaymentPage({
       if (isExternalTokenSegment) {
         if (!purchaseId) throw new Error('Invalid payment link. Missing purchaseId.');
         body = {
-          iiskills_token: rawToken,
+          appmall_token: rawToken,
           purchaseId,
           ...(course ? { course } : {}),
           ...(phone.trim() ? { customer_phone: phone.trim() } : {}),
@@ -587,10 +587,10 @@ export default function SegmentPaymentPage({
       }
 
       const callbackUrl =
-        isIiskillsHandoff
+        isAppmallHandoff
           ? isMobileCheckout()
             ? `${window.location.origin}/api/payments/razorpay-callback`
-            : buildIiskillsRazorpayCallbackUrl({
+            : buildAppmallRazorpayCallbackUrl({
                 tokenPayload,
                 rawToken,
                 purchaseId,
@@ -651,7 +651,7 @@ export default function SegmentPaymentPage({
           retry: { enabled: false },
           ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
           ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
-          ...(isIiskillsHandoff && isMobileCheckout()
+          ...(isAppmallHandoff && isMobileCheckout()
             ? {
                 config: {
                   display: {
@@ -684,8 +684,8 @@ export default function SegmentPaymentPage({
       setStatusText('Open Razorpay and choose UPI to continue…');
 
       const mobileCheckout = isMobileCheckout();
-      // Never redirect iiskills to callback_url on mobile — that cancels UPI intent.
-      const mobileRedirectCheckout = mobileCheckout && !usesIiskillsModalCheckout;
+      // Never redirect appmall to callback_url on mobile — that cancels UPI intent.
+      const mobileRedirectCheckout = mobileCheckout && !usesAppmallModalCheckout;
 
       pendingCheckoutRef.current = {
         orderId: createJson.orderId,
@@ -719,7 +719,7 @@ export default function SegmentPaymentPage({
         ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
         ...(mobileRedirectCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
-        ...(!usesIiskillsModalCheckout
+        ...(!usesAppmallModalCheckout
           ? {
               handler: async function (resp) {
                 if (mobileRedirectCheckout) return;
@@ -760,7 +760,7 @@ export default function SegmentPaymentPage({
           : {}),
 
         modal: {
-          confirm_close: !usesIiskillsModalCheckout,
+          confirm_close: !usesAppmallModalCheckout,
           escape: false,
           backdropclose: false,
           ondismiss: function () {
@@ -770,7 +770,7 @@ export default function SegmentPaymentPage({
               setStatusText('Complete payment in your UPI app, then tap Check payment status.');
               setError('');
               setProcessing(false);
-              // Modal closes when UPI opens — keep checkout lock; do not notify iiskills yet.
+              // Modal closes when UPI opens — keep checkout lock; do not notify appmall yet.
               return;
             }
             checkoutEngagedRef.current = false;
@@ -823,7 +823,7 @@ export default function SegmentPaymentPage({
         setStatusText('');
       });
 
-      if (mobileRedirectCheckout && !usesIiskillsModalCheckout) {
+      if (mobileRedirectCheckout && !usesAppmallModalCheckout) {
         leavingForCheckout = true;
       }
       return;
@@ -862,7 +862,7 @@ export default function SegmentPaymentPage({
         razorpay_order_id,
         razorpay_payment_id,
         razorpay_signature,
-        iiskills_token: rawToken,
+        appmall_token: rawToken,
         purchaseId,
         ...(course ? { course } : {}),
       };
@@ -907,7 +907,7 @@ export default function SegmentPaymentPage({
 
     if (json?.success && json?.confirmFailed) {
       console.error(
-        '[payment] iiskills activation failed after capture:',
+        '[payment] appmall activation failed after capture:',
         json.confirmError,
         'purchaseId:',
         json.purchaseId,
@@ -1064,7 +1064,7 @@ export default function SegmentPaymentPage({
       default:
         return isInitiating || processing
           ? statusText || 'Processing…'
-          : segmentKey === 'iiskills'
+          : segmentKey === 'appmall'
             ? `Submit — ${displayPrice || '₹116.82'}`
             : `Pay ${displayPrice || '₹116.82'}`;
     }

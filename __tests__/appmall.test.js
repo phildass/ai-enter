@@ -1,12 +1,12 @@
 /**
- * Unit tests for the iiskills payment integration.
+ * Unit tests for the appmall payment integration.
  *
- * Run with:  node __tests__/iiskills.test.js
+ * Run with:  node __tests__/appmall.test.js
  *
  * Tests cover:
  *   1. computeConfirmSignature – HMAC-SHA256 over the exact raw body string.
- *   2. callIiskillsConfirm payload shape – all required fields are present.
- *   3. verifyIiskillsToken – JWT HS256 verification round-trip.
+ *   2. callAppmallConfirm payload shape – all required fields are present.
+ *   3. verifyAppmallToken – JWT HS256 verification round-trip.
  */
 
 'use strict';
@@ -45,7 +45,7 @@ function buildJwt(payload, secret) {
 (function testSignatureExactness() {
   const secret = 'test-signing-secret';
 
-  // IISKILLS_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
+  // APPMALL_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
   const DEFAULT_AMOUNT_PAISE = 11682;
 
   const payload = {
@@ -99,7 +99,7 @@ function buildJwt(payload, secret) {
     'event',
   ];
 
-  // IISKILLS_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
+  // APPMALL_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
   const DEFAULT_AMOUNT_PAISE = 11682;
 
   const confirmPayload = {
@@ -148,11 +148,11 @@ function buildJwt(payload, secret) {
 })();
 
 // ---------------------------------------------------------------------------
-// Test 3: verifyIiskillsToken – JWT HS256 round-trip
+// Test 3: verifyAppmallToken – JWT HS256 round-trip
 // ---------------------------------------------------------------------------
 
-(function testVerifyIiskillsToken() {
-  const secret = 'iiskills-test-secret';
+(function testVerifyAppmallToken() {
+  const secret = 'appmall-test-secret';
   const nowSec = Math.floor(Date.now() / 1000);
 
   const validPayload = {
@@ -161,13 +161,13 @@ function buildJwt(payload, secret) {
     phone: '9876543210',
     name: 'Test User',
     course_slug: 'exam-topper-bundle',
-    return_to: 'https://iiskills.in/payment-success',
+    return_to: 'https://appmall.in/payment-success',
     exp: nowSec + 3600,
   };
 
   const token = buildJwt(validPayload, secret);
 
-  // Inline verification (mirrors verifyIiskillsToken logic)
+  // Inline verification (mirrors verifyAppmallToken logic)
   const parts = token.split('.');
   assert.strictEqual(parts.length, 3, 'JWT must have 3 parts');
 
@@ -207,7 +207,7 @@ function buildJwt(payload, secret) {
     'Unknown course slug should not be in allowed list',
   );
 
-  console.log('✓ verifyIiskillsToken: JWT HS256 round-trip');
+  console.log('✓ verifyAppmallToken: JWT HS256 round-trip');
 })();
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ function buildJwt(payload, secret) {
 // ---------------------------------------------------------------------------
 
 (function testTimestampIsSeconds() {
-  // Simulate the timestamp generation used in callIiskillsConfirm
+  // Simulate the timestamp generation used in callAppmallConfirm
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const value = parseInt(timestamp, 10);
 
@@ -238,4 +238,4 @@ function buildJwt(payload, secret) {
 // All tests passed
 // ---------------------------------------------------------------------------
 
-console.log('\nAll iiskills tests passed ✓');
+console.log('\nAll appmall tests passed ✓');

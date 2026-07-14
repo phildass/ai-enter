@@ -119,7 +119,7 @@ pm2 startup
 #### Step 0 — Clear any broken site symlinks
 
 If `sudo nginx -t` fails due to a syntax error in a neighbouring site (e.g.
-`iiskills.in.conf`), remove the broken symlink before proceeding. A single
+`appmall.in.conf`), remove the broken symlink before proceeding. A single
 broken config in `sites-enabled/` prevents Certbot from completing the ACME
 challenge for **any** site on the server.
 
@@ -127,8 +127,8 @@ challenge for **any** site on the server.
 # Identify which symlink is broken
 sudo nginx -t 2>&1
 
-# Example: remove the broken iiskills link (adjust filename as needed)
-sudo rm /etc/nginx/sites-enabled/iiskills.in.conf
+# Example: remove the broken appmall link (adjust filename as needed)
+sudo rm /etc/nginx/sites-enabled/appmall.in.conf
 
 # Confirm Nginx is now happy
 sudo nginx -t
@@ -329,7 +329,7 @@ npm run build && pm2 restart ai-enter
 ### Issue: `nginx -t` fails due to a broken neighbouring site config
 
 **Symptom:** `sudo nginx -t` reports a syntax error in a file such as
-`/etc/nginx/sites-enabled/iiskills.in.conf`, preventing Certbot from completing
+`/etc/nginx/sites-enabled/appmall.in.conf`, preventing Certbot from completing
 the ACME challenge for aienter.in.
 
 **Solution:**
@@ -339,7 +339,7 @@ sudo nginx -t 2>&1
 
 # Remove the broken symlink (Nginx reads the original file in sites-available,
 # so this does not delete the source config — only the active link)
-sudo rm /etc/nginx/sites-enabled/iiskills.in.conf   # adjust filename as needed
+sudo rm /etc/nginx/sites-enabled/appmall.in.conf   # adjust filename as needed
 
 # Confirm Nginx passes its self-test
 sudo nginx -t
@@ -352,7 +352,7 @@ Once aienter.in is fully configured and the certificate is issued, you can
 re-enable the other site (after fixing its config) by recreating the symlink:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/iiskills.in /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/appmall.in /etc/nginx/sites-enabled/
 ```
 
 ### Issue: Port 3040 is not responding

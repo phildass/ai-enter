@@ -1,6 +1,6 @@
-import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
-import { callIiskillsPending } from '../../../lib/callIiskillsPending';
-import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
+import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
+import { callAppmallPending } from '../../../lib/callAppmallPending';
+import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 
 /**
  * Client-triggered grace hook after Razorpay checkout opens (UPI processing).
@@ -11,30 +11,30 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { order_id, purchaseId, iiskills_token, course } = req.body || {};
+  const { order_id, purchaseId, appmall_token, course } = req.body || {};
 
   if (!order_id) {
     return res.status(400).json({ error: 'Missing order_id' });
   }
 
-  if (!iiskills_token) {
-    return res.status(400).json({ error: 'Missing iiskills_token' });
+  if (!appmall_token) {
+    return res.status(400).json({ error: 'Missing appmall_token' });
   }
 
   let payload;
   try {
-    payload = verifyIiskillsToken(iiskills_token, { expectedPurchaseId: purchaseId });
+    payload = verifyAppmallToken(appmall_token, { expectedPurchaseId: purchaseId });
   } catch (err) {
-    return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
+    return res.status(400).json({ error: err.message || 'Invalid appmall token' });
   }
 
-  const appId = resolveIiskillsCourseSlug(course || payload.courseSlug);
+  const appId = resolveAppmallCourseSlug(course || payload.courseSlug);
 
-  const result = await callIiskillsPending({
+  const result = await callAppmallPending({
     purchaseId: payload.purchaseId,
     razorpayOrderId: order_id,
     appId,
-    userToken: iiskills_token,
+    userToken: appmall_token,
   });
 
   if (result.skipped) {

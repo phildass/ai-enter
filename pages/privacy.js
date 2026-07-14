@@ -91,7 +91,7 @@ export default function Privacy() {
           <p>
             AI Cloud Enterprises ("we," "our," or "us") is committed to protecting your privacy. 
             This Privacy Policy explains how we collect, use, disclose, and safeguard your information 
-            when you visit our websites or use our products and services — including IISkills, Jai Bharat, and Jai Kisan.
+            when you visit our websites or use our products and services — including AppMall, Jai Bharat, and Jai Kisan.
           </p>
 
           <h2>2. Information We Collect</h2>

@@ -89,7 +89,7 @@ export default function Terms() {
         <div className="content">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing and using AI Cloud Enterprises platforms and services — including IISkills, Jai Bharat, and Jai Kisan — 
+            By accessing and using AI Cloud Enterprises platforms and services — including AppMall, Jai Bharat, and Jai Kisan — 
             you agree to be bound by these Terms &amp; Conditions. If you do not agree with any part 
             of these terms, you may not use our services.
           </p>
@@ -101,7 +101,7 @@ export default function Terms() {
           <ul>
             <li>Pricing is displayed at the time of purchase on the relevant product platform</li>
             <li>All payments are processed securely through Razorpay</li>
-            <li>Payment can only be initiated from the respective product platform (iiskills.in, jaibharat.cloud, or jaikisan.cloud)</li>
+            <li>Payment can only be initiated from the respective product platform (appmall.in, jaibharat.cloud, or jaikisan.cloud)</li>
           </ul>
 
           <h2>3. Service Access and Content</h2>

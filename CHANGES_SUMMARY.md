@@ -134,7 +134,7 @@ The following require external services/credentials:
 2. ⏳ Email service (SendGrid/AWS SES)
 3. ⏳ SMS service (Twilio/AWS SNS)
 4. ⏳ CAPTCHA service (reCAPTCHA)
-5. ⏳ Image files (iiskills-main-wm1.jpg, iiskills-main.1.jpg)
+5. ⏳ Image files (appmall-main-wm1.jpg, appmall-main.1.jpg)
 
 ## Next Priority Actions
 

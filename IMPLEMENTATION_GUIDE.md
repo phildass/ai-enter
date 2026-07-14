@@ -107,8 +107,8 @@ This document outlines what has been implemented and what still needs to be comp
 - ⏳ Create payment confirmation SMS template
 
 ### Image Updates
-- ⏳ Replace iiskills-image3.jpg with iiskills-main-wm1.jpg (when file is provided)
-- ⏳ Replace iiskills-image4.jpg with iiskills-main.1.jpg (when file is provided)
+- ⏳ Replace appmall-image3.jpg with appmall-main-wm1.jpg (when file is provided)
+- ⏳ Replace appmall-image4.jpg with appmall-main.1.jpg (when file is provided)
 - ⏳ Remove duplicate images if found
 
 ## Technical Implementation Notes

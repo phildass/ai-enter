@@ -4,7 +4,7 @@ set -euo pipefail
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Load env (must contain IISKILLS_PAYMENT_TOKEN_SECRET and AIENTER_CONFIRMATION_SIGNING_SECRET)
+# Load env (must contain APPMALL_PAYMENT_TOKEN_SECRET and AIENTER_CONFIRMATION_SIGNING_SECRET)
 set -a
 if [ -f /etc/ai-enter.env ]; then
   source /etc/ai-enter.env

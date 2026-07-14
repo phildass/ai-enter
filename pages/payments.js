@@ -75,10 +75,10 @@ export default function Payments() {
         <div className="info-icon">💳</div>
         <h1>Payments</h1>
         <p>
-          Direct payments cannot be made on this page. To make a payment and enroll in any course, please visit <span className="highlight">iiskills.in</span>.
+          Direct payments cannot be made on this page. To make a payment and enroll in any course, please visit <span className="highlight">appmall.in</span>.
         </p>
-        <a href="https://iiskills.in" className="cta-button">
-          Go to iiskills.in
+        <a href="https://appmall.in" className="cta-button">
+          Go to appmall.in
         </a>
       </div>
     </Layout>

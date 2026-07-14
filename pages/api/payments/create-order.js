@@ -2,9 +2,9 @@ import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
-import { verifyIiskillsToken } from '../../../lib/verifyIiskillsToken';
-import { IISKILLS_ALLOWED_COURSES, IISKILLS_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
-import { resolveIiskillsCourseSlug } from '../../../lib/iiskillsOffer';
+import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
+import { APPMALL_ALLOWED_COURSES, APPMALL_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
+import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
 
@@ -26,14 +26,14 @@ export default async function handler(req, res) {
     return_url,
     course;
 
-  if (req.body.iiskills_token) {
+  if (req.body.appmall_token) {
     let payload;
     try {
-      payload = verifyIiskillsToken(req.body.iiskills_token, {
+      payload = verifyAppmallToken(req.body.appmall_token, {
         expectedPurchaseId: req.body.purchaseId,
       });
     } catch (err) {
-      return res.status(400).json({ error: err.message || 'Invalid iiskills token' });
+      return res.status(400).json({ error: err.message || 'Invalid appmall token' });
     }
 
     user_id = payload.user_id || null;
@@ -43,26 +43,26 @@ export default async function handler(req, res) {
       null;
     customer_name = payload.name || payload.customer_name || null;
     user_email = payload.user_email || payload.email || null;
-    app_name = 'iiskills';
-    course = resolveIiskillsCourseSlug(req.body.course || payload.courseSlug);
+    app_name = 'appmall';
+    course = resolveAppmallCourseSlug(req.body.course || payload.courseSlug);
 
     if (!user_email || typeof user_email !== 'string' || !user_email.includes('@')) {
       return res.status(400).json({
-        error: 'Payment token is missing the payer email. Please restart checkout from iiskills.',
+        error: 'Payment token is missing the payer email. Please restart checkout from appmall.',
       });
     }
     user_email = user_email.trim().toLowerCase();
 
-    if (!IISKILLS_ALLOWED_COURSES.includes(course)) {
+    if (!APPMALL_ALLOWED_COURSES.includes(course)) {
       return res.status(400).json({ error: `Invalid course in token: ${course}` });
     }
 
-    amount_paise = payload.amount_paise || payload.amountPaise || IISKILLS_DEFAULT_AMOUNT_PAISE;
+    amount_paise = payload.amount_paise || payload.amountPaise || APPMALL_DEFAULT_AMOUNT_PAISE;
     currency = payload.currency || 'INR';
     validity_days = payload.validity_days || 365;
     return_url = payload.return_to || payload.return_url || null;
     session_id = payload.purchaseId;
-    handoff_token = req.body.iiskills_token;
+    handoff_token = req.body.appmall_token;
   } else if (req.body.session_token) {
     let payload;
     try {
@@ -87,10 +87,10 @@ export default async function handler(req, res) {
       if (course && typeof course !== 'string') {
         return res.status(400).json({ error: 'Invalid course value' });
       }
-      if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
+      if (course && !APPMALL_ALLOWED_COURSES.includes(course)) {
         return res
           .status(400)
-          .json({ error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', ') });
+          .json({ error: 'Invalid course. Must be one of: ' + APPMALL_ALLOWED_COURSES.join(', ') });
       }
     }
   } else {
@@ -98,9 +98,9 @@ export default async function handler(req, res) {
     if (course && typeof course !== 'string') {
       return res.status(400).json({ error: 'Invalid course value' });
     }
-    if (course && !IISKILLS_ALLOWED_COURSES.includes(course)) {
+    if (course && !APPMALL_ALLOWED_COURSES.includes(course)) {
       return res.status(400).json({
-        error: 'Invalid course. Must be one of: ' + IISKILLS_ALLOWED_COURSES.join(', '),
+        error: 'Invalid course. Must be one of: ' + APPMALL_ALLOWED_COURSES.join(', '),
       });
     }
   }
@@ -113,7 +113,7 @@ export default async function handler(req, res) {
   try {
     if (!isSupportedPaymentApp(app_name)) {
       return res.status(400).json({
-        error: 'Unsupported payment app. Only iiskills is supported.',
+        error: 'Unsupported payment app. Only appmall is supported.',
       });
     }
 

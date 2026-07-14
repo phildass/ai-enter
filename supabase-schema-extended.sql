@@ -105,12 +105,12 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   customer_name TEXT,
 
   -- App identification
-  app_name TEXT NOT NULL, -- 'iiskills', 'jai-kisan', or 'jai-bharat'
+  app_name TEXT NOT NULL, -- 'appmall', 'jai-kisan', or 'jai-bharat'
 
   -- Handoff session tracking
   session_id TEXT,
 
-  -- Course selected at payment time (iiskills segment)
+  -- Course selected at payment time (appmall segment)
   course TEXT,
 
   -- Payment details
@@ -155,11 +155,11 @@ ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS validity_days INTEGER 
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS return_url TEXT;
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE payment_transactions ALTER COLUMN webhook_sent_at TYPE TIMESTAMP WITH TIME ZONE;
--- Allow anonymous iiskills payments where user_id may not be known
+-- Allow anonymous appmall payments where user_id may not be known
 ALTER TABLE payment_transactions ALTER COLUMN user_id DROP NOT NULL;
--- Track which course was selected during payment (iiskills segment)
+-- Track which course was selected during payment (appmall segment)
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS course TEXT;
--- Customer name for iiskills phone-only flow
+-- Customer name for appmall phone-only flow
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS customer_name TEXT;
 -- JWT/handoff token stored for mobile Razorpay callback completion
 ALTER TABLE payment_transactions ADD COLUMN IF NOT EXISTS handoff_token TEXT;

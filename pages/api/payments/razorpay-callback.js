@@ -11,7 +11,7 @@ import {
   isWithinCheckoutCooldown,
 } from '../../../lib/razorpayCapture';
 
-const DEFAULT_REDIRECT = 'https://iiskills.in/dashboard';
+const DEFAULT_REDIRECT = 'https://appmall.in/dashboard';
 
 const TX_SELECT =
   'app_name, session_id, course, handoff_token, status, return_url, razorpay_order_id, razorpay_payment_id, created_at, updated_at';
@@ -42,7 +42,7 @@ const SITE_BASE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://aienter.in').rep
 
 function buildHandoffPaymentRetryUrl(transaction) {
   if (!transaction?.handoff_token || !transaction?.session_id) return null;
-  const path = '/payments/iiskills';
+  const path = '/payments/appmall';
   const url = new URL(`${SITE_BASE}${path}`);
   url.searchParams.set('token', transaction.handoff_token);
   url.searchParams.set('purchaseId', transaction.session_id);
@@ -184,7 +184,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
       ...paymentParams,
       purchaseId,
       course: transaction?.course,
-      iiskills_token: handoffToken || undefined,
+      appmall_token: handoffToken || undefined,
       app_name: appName,
       entitlement_source: 'callback',
     });
@@ -208,7 +208,7 @@ async function finalizeAndRedirect(res, { transaction, appName, paymentParams })
     console.error('[razorpay-callback] Origin confirm failed:', result.confirmError);
     return redirect(
       res,
-      `/payments/success?pending=1&confirm=failed&app=${encodeURIComponent(appName || 'iiskills')}`,
+      `/payments/success?pending=1&confirm=failed&app=${encodeURIComponent(appName || 'appmall')}`,
     );
   }
 
@@ -229,7 +229,7 @@ async function handleStandardCheckoutCallback(
     transaction = await loadTransaction(supabase, { orderId: razorpay_order_id });
   }
 
-  const appName = transaction?.app_name || 'iiskills';
+  const appName = transaction?.app_name || 'appmall';
   const retryUrl = buildHandoffPaymentRetryUrl(transaction);
 
   // Cancelled UPI / premature redirect — never 303 to error (aborts retry and confuses users).
@@ -337,7 +337,7 @@ export default async function handler(req, res) {
     return respondWaiting(res, {
       reason: `Awaiting payment.captured (got ${webhookEvent})`,
       paymentStatus: 'pending',
-      appName: 'iiskills',
+      appName: 'appmall',
     });
   }
 
@@ -352,7 +352,7 @@ export default async function handler(req, res) {
     return respondWaiting(res, {
       reason: 'Payment not captured yet',
       paymentStatus: inlineStatus,
-      appName: 'iiskills',
+      appName: 'appmall',
     });
   }
 
@@ -390,7 +390,7 @@ export default async function handler(req, res) {
       return respondWaiting(res, {
         reason: 'Payment link not paid yet',
         paymentStatus: razorpay_payment_link_status,
-        appName: 'iiskills',
+        appName: 'appmall',
       });
     }
 
@@ -410,7 +410,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const appName = transaction?.app_name || 'iiskills';
+    const appName = transaction?.app_name || 'appmall';
     const { keyId, keySecret } = getRazorpayCredentialsForApp(appName);
     if (!keySecret) {
       return paymentErrorRedirect(res, 'Payment system not configured');
@@ -527,7 +527,7 @@ export default async function handler(req, res) {
     return respondWaiting(res, {
       reason: 'Payment was not completed. Return to the payment page and try again.',
       paymentStatus: 'pending',
-      appName: 'iiskills',
+      appName: 'appmall',
     });
   }
 
@@ -544,7 +544,7 @@ export default async function handler(req, res) {
     return respondWaiting(res, {
       reason: 'Payment was not completed. Return to the payment page and try again.',
       paymentStatus: 'pending',
-      appName: 'iiskills',
+      appName: 'appmall',
     });
   }
 

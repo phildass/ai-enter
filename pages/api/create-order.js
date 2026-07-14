@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid course' });
     }
 
-    const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp('iiskills');
+    const { keyId, keySecret, publicKey } = getRazorpayCredentialsForApp('appmall');
     if (!keyId || !keySecret) {
       return res.status(500).json({
         error: 'Payment system not configured. Please contact administrator.',

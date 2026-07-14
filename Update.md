@@ -2,14 +2,14 @@
 
 ### 📋 Project Overview
 
-**AI-Enter** is a payment gateway aggregator that handles course purchases from multiple educational platforms (iiskills, jai-bharat, jai-kisan, iisacademy) and processes payments through **Razorpay**, then confirms purchases back to origin platforms.
+**AI-Enter** is a payment gateway aggregator that handles course purchases from multiple educational platforms (appmall, jai-bharat, jai-kisan, iisacademy) and processes payments through **Razorpay**, then confirms purchases back to origin platforms.
 
 **Live URL:** https://aienter.in
 
 ### 🏗️ Architecture
 
 ```
-Origin Sites (iiskills, jai-bharat, etc.)
+Origin Sites (appmall, jai-bharat, etc.)
          ↓ (generates payment token)
   aienter.in payment page
          ↓ (user completes payment)
@@ -17,7 +17,7 @@ Origin Sites (iiskills, jai-bharat, etc.)
          ↓ (verification)
   /api/payments/verify-payment
          ↓ (confirm purchase)
-  Origin Site Webhook / iiskills Confirm Endpoint
+  Origin Site Webhook / appmall Confirm Endpoint
          ↓ (grant access)
   User Dashboard with Paid Badge
 ```
@@ -53,12 +53,12 @@ ai-enter/
 │   │   └── webhooks/
 │   │       └── razorpay.js              # Razorpay webhook handler
 │   ├── payments/
-│   │   ├── iiskills.js                  # iiskills payment page
+│   │   ├── appmall.js                  # appmall payment page
 │   │   ├── jaibharat.js                 # jai-bharat payment page
 │   │   ├── jaikisan.js                  # jai-kisan payment page
 │   │   ├── iisacademy.js                # iisacademy payment page
 │   │   ├── iisacademy2.js               # iisacademy variant 2
-│   │   └── (iiskills only)
+│   │   └── (appmall only)
 │   │   ├── jaibharatpay.js              # jai-bharat payment flow
 │   │   ├── jaikisanpay.js               # jai-kisan payment flow
 │   │   └── success.js                   # Payment success page (auto-redirects)
@@ -72,7 +72,7 @@ ai-enter/
 │   ├── terms.js                         # Terms of service
 │   └── _app.js                          # Next.js App wrapper
 ├── lib/
-│   ├── verifyIiskillsToken.js           # JWT verification for iiskills tokens
+│   ├── verifyAppmallToken.js           # JWT verification for appmall tokens
 │   └── (uriq removed)
 │   ├── verifyHandoffToken.js            # Token verification for origin sites
 │   ├── handoff.js                       # Webhook signing utilities
@@ -118,29 +118,29 @@ JAI_KISAN_WEBHOOK_URL=https://jaikisan.cloud/api/payments/ai-enter/callback
 JAI_BHARAT_WEBHOOK_URL=https://jaibharat.cloud/api/payments/ai-enter/callback
 IISACADEMY_WEBHOOK_URL=https://iisacademy.in/api/payments/ai-enter/callback
 
-# iiskills Integration
-IISKILLS_PAYMENT_TOKEN_SECRET=xxxxx      # JWT secret from iiskills
-AIENTER_CONFIRMATION_SIGNING_SECRET=xxxxx # For signing iiskills confirm requests
-IISKILLS_CONFIRM_URL=https://iiskills.in/api/payments/confirm  # iiskills confirm endpoint
+# appmall Integration
+APPMALL_PAYMENT_TOKEN_SECRET=xxxxx      # JWT secret from appmall
+AIENTER_CONFIRMATION_SIGNING_SECRET=xxxxx # For signing appmall confirm requests
+APPMALL_CONFIRM_URL=https://appmall.in/api/payments/confirm  # appmall confirm endpoint
 ```
 
-### 💳 Payment Flow: iiskills.in Integration (Live)
+### 💳 Payment Flow: appmall.in Integration (Live)
 
 **Step 1: Token Generation**
-- User on iiskills.in clicks "Pay with AI-Enter"
-- iiskills generates JWT token with:
+- User on appmall.in clicks "Pay with AI-Enter"
+- appmall generates JWT token with:
   - `purchaseId`: Unique purchase ID
   - `courseSlug`: Selected course (learn-ai, learn-developer, etc.)
-  - `user_id`: iiskills user ID
+  - `user_id`: appmall user ID
   - `phone`: User phone number
   - `name`: User name
   - `exp`: Token expiration time
 
 **Step 2: Payment Page**
 ```
-GET /payments/iiskills?token=<jwt_token>
+GET /payments/appmall?token=<jwt_token>
 ```
-- Token validated in `getServerSideProps` using `IISKILLS_PAYMENT_TOKEN_SECRET`
+- Token validated in `getServerSideProps` using `APPMALL_PAYMENT_TOKEN_SECRET`
 - User details displayed (name, phone, course)
 - Pricing shown: ₹99 + 18% GST = ₹116.82
 
@@ -148,7 +148,7 @@ GET /payments/iiskills?token=<jwt_token>
 ```
 POST /api/payments/create-order
 Body: {
-  iiskills_token: <jwt>,
+  appmall_token: <jwt>,
   purchaseId: <id>,
   course: <course_slug>
 }
@@ -170,14 +170,14 @@ Body: {
   razorpay_order_id: <order_id>,
   razorpay_payment_id: <payment_id>,
   razorpay_signature: <signature>,
-  iiskills_token: <jwt>,
+  appmall_token: <jwt>,
   purchaseId: <purchase_id>
 }
 ```
 - Backend verifies Razorpay signature using `RAZORPAY_KEY_SECRET`
-- Calls iiskills confirm endpoint:
+- Calls appmall confirm endpoint:
 ```
-POST https://iiskills.in/api/payments/confirm
+POST https://appmall.in/api/payments/confirm
 Headers:
   x-aienter-signature: HMAC-SHA256(body, AIENTER_CONFIRMATION_SIGNING_SECRET)
   x-aienter-timestamp: Unix timestamp
@@ -191,23 +191,23 @@ Body: {
   user_token: <jwt_token>
 }
 ```
-- iiskills confirms purchase and grants access
+- appmall confirms purchase and grants access
 - Supabase updated with payment status: `success`
-- Returns redirect URL from iiskills
+- Returns redirect URL from appmall
 
 **Step 6: Success Page & Auto-Redirect**
 ```
 GET /payments/success
 ```
 - Shows confirmation: "Payment Successful! ₹116.82"
-- Auto-redirects to `https://iiskills.in/dashboard` after 3 seconds
-- User sees "Paid User" badge in iiskills dashboard
+- Auto-redirects to `https://appmall.in/dashboard` after 3 seconds
+- User sees "Paid User" badge in appmall dashboard
 - Can access all paid courses
 
 ### 🔐 Security Features
 
-**1. Token Verification (iiskills)**
-- JWT validated with `IISKILLS_PAYMENT_TOKEN_SECRET`
+**1. Token Verification (appmall)**
+- JWT validated with `APPMALL_PAYMENT_TOKEN_SECRET`
 - Checks signature, expiration, course slug, and purchase ID
 - Direct access to payment page blocked (must have valid token)
 
@@ -215,13 +215,13 @@ GET /payments/success
 - HMAC-SHA256 signature verified on every payment
 - Prevents tampering with payment data
 
-**3. Webhook Signing (iiskills confirm)**
+**3. Webhook Signing (appmall confirm)**
 - HMAC-SHA256 signature sent in `x-aienter-signature` header
-- iiskills verifies using `AIENTER_CONFIRMATION_SIGNING_SECRET`
+- appmall verifies using `AIENTER_CONFIRMATION_SIGNING_SECRET`
 - Replay protection via `x-aienter-timestamp`
 
 **4. CORS & Origin Validation**
-- Only iiskills.in can initiate payments
+- Only appmall.in can initiate payments
 - Direct access attempts show security warning
 
 ### 📊 Key Features
@@ -229,7 +229,7 @@ GET /payments/success
 | Feature | Status | Details |
 |---------|--------|---------|
 | Razorpay Integration | ✅ Live | Full payment gateway integration |
-| iiskills Integration | ✅ Live | Token-based payment flow |
+| appmall Integration | ✅ Live | Token-based payment flow |
 | JWT Verification | ✅ Live | Secure token validation |
 | Supabase Tracking | ✅ Live | Payment transaction logging |
 | Auto-Redirect | ✅ Live | Redirect to dashboard after payment |
@@ -289,14 +289,14 @@ GET /payments/success
 - Check: Razorpay order ID matches payment ID
 - Check: Signature computation is correct
 
-**Issue: iiskills confirmation fails**
-- Check: `AIENTER_CONFIRMATION_SIGNING_SECRET` matches iiskills config
-- Check: `IISKILLS_CONFIRM_URL` is correct
+**Issue: appmall confirmation fails**
+- Check: `AIENTER_CONFIRMATION_SIGNING_SECRET` matches appmall config
+- Check: `APPMALL_CONFIRM_URL` is correct
 - Check: Timestamp is within acceptable range
 
 ### 📝 Recent Changes
 
-**Commit: 3093f78** - Auto-redirect to iiskills dashboard
+**Commit: 3093f78** - Auto-redirect to appmall dashboard
 - Success page now redirects after 3 seconds
 - Added "Go to Dashboard Now" button
 - Shows countdown message
@@ -337,7 +337,7 @@ git push origin main
 
 ### 📞 Support
 
-- **iiskills Support:** support@iiskills.in
+- **appmall Support:** support@appmall.in
 - **Site Admin:** phildass (GitHub)
 - **Server:** Hostinger (cpanel)
 

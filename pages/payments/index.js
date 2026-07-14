@@ -1,7 +1,7 @@
 export async function getServerSideProps() {
   return {
     redirect: {
-      destination: 'https://iiskills.in',
+      destination: 'https://appmall.in',
       permanent: false,
     },
   };

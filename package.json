@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/start-server.js",
-    "test": "node __tests__/iiskills.test.js"
+    "test": "node __tests__/appmall.test.js"
   },
   "repository": {
     "type": "git",

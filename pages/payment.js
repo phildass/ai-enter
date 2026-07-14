@@ -5,7 +5,7 @@ export default function Payment() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/payments/iiskills');
+    router.replace('/payments/appmall');
   }, [router]);
 
   return (

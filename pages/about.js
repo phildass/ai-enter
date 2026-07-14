@@ -223,7 +223,7 @@ export default function About() {
             <div>
               <h2>Our Approach</h2>
               <p>
-                We build and maintain focused SaaS products under distinct brands — IISkills, Jai Bharat, and Jai Kisan — each solving a well-defined problem for a distinct user base.
+                We build and maintain focused SaaS products under distinct brands — AppMall, Jai Bharat, and Jai Kisan — each solving a well-defined problem for a distinct user base.
               </p>
               <p>
                 Shared infrastructure, including a common payment gateway, reduces integration overhead while keeping each product experience clean and brand-appropriate.

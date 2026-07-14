@@ -3,12 +3,12 @@ import Link from 'next/link';
 
 const products = [
   {
-    key: 'iiskills',
-    name: 'IISkills',
+    key: 'appmall',
+    name: 'AppMall',
     tagline: 'Professional skills and learning apps',
     description: 'A suite of learning applications for professional development, skill-building, and career advancement.',
-    domain: 'iiskills.in',
-    paymentPath: '/payments/iiskills',
+    domain: 'appmall.in',
+    paymentPath: '/payments/appmall',
     color: '#7c3aed',
     bg: '#ede9fe',
     emoji: '📚',

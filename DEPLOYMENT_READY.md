@@ -112,8 +112,8 @@ RECAPTCHA_SECRET_KEY=your_secret_key
 
 ### 5. Image Assets
 **Optional**: New hero images
-- iiskills-main-wm1.jpg (to replace iiskills-image3.jpg if exists)
-- iiskills-main.1.jpg (to replace iiskills-image4.jpg if exists)
+- appmall-main-wm1.jpg (to replace appmall-image3.jpg if exists)
+- appmall-main.1.jpg (to replace appmall-image4.jpg if exists)
 
 Place in: `/public/images/`
 

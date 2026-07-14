@@ -1,17 +1,17 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
-import { verifyIiskillsToken } from '../../lib/verifyIiskillsToken';
+import { verifyAppmallToken } from '../../lib/verifyAppmallToken';
 import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePendingPayment';
-import { IISKILLS_ALLOWED_COURSES } from '../../lib/courses';
-import { BUNDLE_COURSE_SLUG } from '../../lib/iiskillsOffer';
+import { APPMALL_ALLOWED_COURSES } from '../../lib/courses';
+import { BUNDLE_COURSE_SLUG } from '../../lib/appmallOffer';
 
 const NO_TOKEN_ERROR = {
   title: 'Payment Link Required',
   lines: [
-    'This page can only be accessed from iiskills.in.',
-    'Please click "Pay" on your iiskills dashboard to start the payment process.',
+    'This page can only be accessed from appmall.in.',
+    'Please click "Pay" on your appmall dashboard to start the payment process.',
   ],
-  portalUrl: 'https://iiskills.in/dashboard',
-  portalLabel: 'Go to iiskills.in Dashboard',
+  portalUrl: 'https://appmall.in/dashboard',
+  portalLabel: 'Go to appmall.in Dashboard',
 };
 
 function makeTokenVerificationError(reason) {
@@ -20,10 +20,10 @@ function makeTokenVerificationError(reason) {
     lines: [
       'Your payment link could not be verified.',
       `Reason: ${reason}`,
-      'Please go back to iiskills.in and click "Pay" again to get a fresh link.',
+      'Please go back to appmall.in and click "Pay" again to get a fresh link.',
     ],
-    portalUrl: 'https://iiskills.in/dashboard',
-    portalLabel: 'Go to iiskills.in Dashboard',
+    portalUrl: 'https://appmall.in/dashboard',
+    portalLabel: 'Go to appmall.in Dashboard',
   };
 }
 
@@ -38,16 +38,16 @@ export async function getServerSideProps({ query }) {
   }
 
   try {
-    const payload = verifyIiskillsToken(token, { expectedPurchaseId: purchaseId });
+    const payload = verifyAppmallToken(token, { expectedPurchaseId: purchaseId });
 
-    if (!IISKILLS_ALLOWED_COURSES.includes(payload.courseSlug)) {
-      console.error('[iiskills-payments] Course not in allowed list:', payload.courseSlug);
+    if (!APPMALL_ALLOWED_COURSES.includes(payload.courseSlug)) {
+      console.error('[appmall-payments] Course not in allowed list:', payload.courseSlug);
       return { props: { tokenError: makeTokenVerificationError(`Course "${payload.courseSlug}" is not available.`) } };
     }
 
     if (paymentRetry) {
       await invalidatePendingPaymentTransaction({
-        appName: 'iiskills',
+        appName: 'appmall',
         sessionId: payload.purchaseId,
       });
     }
@@ -61,7 +61,7 @@ export async function getServerSideProps({ query }) {
       },
     };
   } catch (err) {
-    console.error('[iiskills-payments] Token verification failed:', err.message);
+    console.error('[appmall-payments] Token verification failed:', err.message);
 
     const reason = /expire/i.test(err.message)
       ? 'The payment link has expired. Please get a new one.'
@@ -77,7 +77,7 @@ export async function getServerSideProps({ query }) {
   }
 }
 
-export default function IisSkillsPaymentsPage({
+export default function AppMallPaymentsPage({
   tokenPayload,
   rawToken,
   purchaseId,
@@ -94,8 +94,8 @@ export default function IisSkillsPaymentsPage({
 
   return (
     <SegmentPaymentPage
-      segmentKey="iiskills"
-      brandName="iiskills"
+      segmentKey="appmall"
+      brandName="appmall"
       emoji="🎓"
       bgGradient="linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)"
       iconBg="#ede9fe"
@@ -106,9 +106,9 @@ export default function IisSkillsPaymentsPage({
       validityText="1 Year"
       validityLabel="Entrance Exams + Topper + Astro Bundle"
       features={bundleFeatures}
-      originDomain="iiskills.in"
+      originDomain="appmall.in"
       description="Entrance Exams + Topper + Astro — 1-Year Access"
-      tokenKind="iiskills"
+      tokenKind="appmall"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}
       tokenError={tokenError || null}
