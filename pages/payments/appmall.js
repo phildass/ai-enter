@@ -1,7 +1,12 @@
 import SegmentPaymentPage from '../../components/SegmentPaymentPage';
 import { verifyAppmallToken } from '../../lib/verifyAppmallToken';
 import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePendingPayment';
-import { APPMALL_ALLOWED_COURSES } from '../../lib/courses';
+import {
+  APPMALL_ALLOWED_COURSES,
+  CURRENT_BUNDLE,
+  MEMBERSHIP_LIMITED_TIME_NOTICE,
+  MEMBERSHIP_TAGLINE,
+} from '../../lib/courses';
 import { BUNDLE_COURSE_SLUG } from '../../lib/appmallOffer';
 
 const NO_TOKEN_ERROR = {
@@ -84,14 +89,6 @@ export default function AppMallPaymentsPage({
   tokenError,
   paymentRetry,
 }) {
-  const bundleFeatures = [
-    'Full Entrance Exams app access',
-    'Full Topper app access',
-    'Astro detailed Kundli + AI Astrologer',
-    'Exam-oriented content and analytics',
-    'No recurring monthly fees',
-  ];
-
   return (
     <SegmentPaymentPage
       segmentKey="appmall"
@@ -103,19 +100,20 @@ export default function AppMallPaymentsPage({
       accentGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
       accentColor="#667eea"
       accentDisabled="#a5b4fc"
-      validityText="1 Year"
-      validityLabel="Entrance Exams + Topper + Astro Bundle"
-      features={bundleFeatures}
+      validityText="12 + 1 Months"
+      validityLabel={MEMBERSHIP_TAGLINE}
+      features={CURRENT_BUNDLE.features}
+      limitedTimeNotice={MEMBERSHIP_LIMITED_TIME_NOTICE}
       originDomain="appmall.in"
-      description="Entrance Exams + Topper + Astro — 1-Year Access"
+      description={MEMBERSHIP_TAGLINE}
       tokenKind="appmall"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}
       tokenError={tokenError || null}
-      fixedCourseLabel="Entrance Exams + Topper + Astro Bundle"
+      fixedCourseLabel="App-Mall Membership — All Apps"
       paymentCourse={BUNDLE_COURSE_SLUG}
       displayPrice="₹116.82"
-      priceBreakdown="(₹99 + 18% GST)"
+      priceBreakdown="(₹99 + 18% GST) — limited time"
       paymentRetry={paymentRetry}
     />
   );

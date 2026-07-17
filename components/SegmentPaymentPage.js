@@ -106,11 +106,16 @@ function fetchWithTimeout(url, options) {
 }
 
 const COURSE_LABELS = {
-  'exam-topper-bundle': 'Entrance Exams + Topper + Astro Bundle',
-  'entrance-exams': 'Entrance Exams',
-  'topper': 'Topper',
-  'astro': 'Astro',
+  'exam-topper-bundle': 'App-Mall Membership — All Apps',
+  'entrance-exams': 'App-Mall Membership — All Apps',
+  'topper': 'App-Mall Membership — All Apps',
+  'astro': 'App-Mall Membership — All Apps',
+  'govtjobs': 'App-Mall Membership — All Apps',
+  'poexams': 'App-Mall Membership — All Apps',
+  'irj': 'App-Mall Membership — All Apps',
+  'lm': 'App-Mall Membership — All Apps',
   'astro-question': 'Astro AI Astrologer — 1 Question',
+  'janam-kundli': 'Janam Kundli — Detailed Report',
 };
 
 const PHONE_RE = /^\d{10}$/;
@@ -192,6 +197,7 @@ export default function SegmentPaymentPage({
   validityText,
   validityLabel,
   features,
+  limitedTimeNotice,
   originDomain,
   description,
   tokenPayload,
@@ -1307,6 +1313,22 @@ export default function SegmentPaymentPage({
             <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>
               {priceBreakdown || '(₹99 + 18% GST)'}
             </p>
+
+            {limitedTimeNotice ? (
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 800,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  color: '#fecaca',
+                  marginBottom: '1rem',
+                  lineHeight: 1.4,
+                }}
+              >
+                {limitedTimeNotice}
+              </p>
+            ) : null}
 
             <p style={{ fontSize: '0.8rem', opacity: 0.9, marginBottom: '1rem' }}>
               ✅ Valid for {validityText}

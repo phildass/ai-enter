@@ -59,7 +59,7 @@ export default async function handler(req, res) {
 
     amount_paise = payload.amount_paise || payload.amountPaise || APPMALL_DEFAULT_AMOUNT_PAISE;
     currency = payload.currency || 'INR';
-    validity_days = payload.validity_days || 365;
+    validity_days = payload.validity_days || 395;
     return_url = payload.return_to || payload.return_url || null;
     session_id = payload.purchaseId;
     handoff_token = req.body.appmall_token;

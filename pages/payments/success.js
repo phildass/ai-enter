@@ -8,7 +8,7 @@ const appDetails = {
   cardBg: '#ede9fe',
   titleColor: '#4c1d95',
   accentColor: '#7c3aed',
-  validity: '1 year',
+  validity: '12 + 1 months',
   dashboardUrl: 'https://appmall.in/dashboard',
 };
 
@@ -117,9 +117,12 @@ export default function PaymentSuccess() {
 
           {isCapturedSuccess && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
-            <p>✅ Payment Amount: ₹116.82</p>
+            <p>✅ Membership AppMall Validity: 12 + 1 Month, Amount Rs 116.82</p>
             <p>✅ Access Valid for {appDetails.validity}</p>
-            <p>✅ No Recurring Fees</p>
+            <p>✅ All App-Mall apps included</p>
+            <p style={{ fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', fontSize: '0.75rem' }}>
+              This Rs 99 membership fee is for a limited time only and can be changed at any moment.
+            </p>
           </div>
           )}
 
