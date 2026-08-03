@@ -18,7 +18,7 @@ const NO_TOKEN_ERROR = {
   title: 'Payment Link Required',
   lines: [
     'This discounted page can only be opened from appmall.in with a valid signed link.',
-    'Open the Instagram discount checkout on appmall.in and enter code APPMALL-DISC-99.',
+    'Open the follower discount checkout on appmall.in and enter code APPMALL-DISC-99.',
   ],
   portalUrl: 'https://appmall.in/payments/discounted',
   portalLabel: 'Go to AppMall discounted checkout',
@@ -40,8 +40,8 @@ function makeTokenVerificationError(reason) {
 const IG_FEATURES = [
   'Access to all App-Mall apps',
   'Validity: 13 months',
-  'Instagram follower offer — no 1+1 add-on',
-  'Follow @philintheblank100 must be confirmed within 24 hours',
+  'Instagram (@philintheblank100) or YouTube (@phildass2739) follower offer — no 1+1 add-on',
+  'Username submitted as @xyz; follow must be confirmed within 24 hours',
   'No refund if membership is cancelled for failed follow verification',
   'No recurring monthly fees',
 ];
@@ -71,7 +71,7 @@ export async function getServerSideProps({ query }) {
       return {
         props: {
           tokenError: makeTokenVerificationError(
-            'This link is not an Instagram discount session. Use the standard membership checkout.',
+            'This link is not a follower discount session. Use the standard membership checkout.',
           ),
         },
       };
