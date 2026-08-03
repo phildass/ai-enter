@@ -61,9 +61,14 @@ export default async function handler(req, res) {
       req.body.amount_paise ||
       payload.amount_paise ||
       payload.amountPaise ||
-      resolveAppmallAmountPaise(course);
+      resolveAppmallAmountPaise(course, payload.amount_incl_gst, {
+        pricingTier: payload.pricing_tier || payload.pricingTier,
+      });
     currency = payload.currency || 'INR';
-    validity_days = payload.validity_days || 365;
+    validity_days =
+      payload.pricing_tier === 'ig_disc_99' || payload.pricingTier === 'ig_disc_99'
+        ? 395
+        : payload.validity_days || 365;
     return_url = payload.return_to || payload.return_url || null;
     session_id = payload.purchaseId;
     handoff_token = req.body.appmall_token;
