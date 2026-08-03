@@ -8,7 +8,7 @@ const appDetails = {
   cardBg: '#ede9fe',
   titleColor: '#4c1d95',
   accentColor: '#7c3aed',
-  validity: '12 + 1 months',
+  validity: '12 months',
   dashboardUrl: 'https://appmall.in/dashboard',
 };
 
