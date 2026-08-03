@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
-import { APPMALL_ALLOWED_COURSES, APPMALL_DEFAULT_AMOUNT_PAISE } from '../../../lib/courses';
+import { APPMALL_ALLOWED_COURSES, APPMALL_DEFAULT_AMOUNT_PAISE, resolveAppmallAmountPaise } from '../../../lib/courses';
 import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
@@ -57,9 +57,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Invalid course in token: ${course}` });
     }
 
-    amount_paise = payload.amount_paise || payload.amountPaise || APPMALL_DEFAULT_AMOUNT_PAISE;
+    amount_paise =
+      req.body.amount_paise ||
+      payload.amount_paise ||
+      payload.amountPaise ||
+      resolveAppmallAmountPaise(course);
     currency = payload.currency || 'INR';
-    validity_days = payload.validity_days || 395;
+    validity_days = payload.validity_days || 365;
     return_url = payload.return_to || payload.return_url || null;
     session_id = payload.purchaseId;
     handoff_token = req.body.appmall_token;
@@ -244,7 +248,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const finalAmountPaise = amount_paise || 11682;
+    const finalAmountPaise = amount_paise || APPMALL_DEFAULT_AMOUNT_PAISE;
     const finalCurrency = currency || 'INR';
     const receiptSuffix = Date.now().toString(36);
 

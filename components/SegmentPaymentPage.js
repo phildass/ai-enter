@@ -209,6 +209,7 @@ export default function SegmentPaymentPage({
   paymentCourse,
   displayPrice,
   priceBreakdown,
+  amountPaise: amountPaiseProp,
   paymentRetry = false,
 }) {
   const router = useRouter();
@@ -522,6 +523,7 @@ export default function SegmentPaymentPage({
           purchaseId,
           ...(course ? { course } : {}),
           ...(phone.trim() ? { customer_phone: phone.trim() } : {}),
+          ...(amountPaiseProp ? { amount_paise: amountPaiseProp } : {}),
         };
       } else {
         body = rawToken
@@ -1071,15 +1073,15 @@ export default function SegmentPaymentPage({
         return isInitiating || processing
           ? statusText || 'Processing…'
           : segmentKey === 'appmall'
-            ? `Submit — ${displayPrice || '₹116.82'}`
-            : `Pay ${displayPrice || '₹116.82'}`;
+            ? `Submit — ${displayPrice || '₹588.82'}`
+            : `Pay ${displayPrice || '₹588.82'}`;
     }
   })();
 
   return (
     <>
       <Head>
-        <title>{brandName} Payment - {displayPrice || '₹116.82'}</title>
+        <title>{brandName} Payment - {displayPrice || '₹588.82'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
@@ -1307,11 +1309,11 @@ export default function SegmentPaymentPage({
             </p>
 
             <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '3rem', fontWeight: 700 }}>{displayPrice || '₹116.82'}</span>
+              <span style={{ fontSize: '3rem', fontWeight: 700 }}>{displayPrice || '₹588.82'}</span>
             </div>
 
             <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>
-              {priceBreakdown || '(₹99 + 18% GST)'}
+              {priceBreakdown || '(₹499 + 18% GST) — 1 + 1 for the price of one'}
             </p>
 
             {limitedTimeNotice ? (

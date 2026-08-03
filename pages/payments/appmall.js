@@ -6,6 +6,9 @@ import {
   CURRENT_BUNDLE,
   MEMBERSHIP_LIMITED_TIME_NOTICE,
   MEMBERSHIP_TAGLINE,
+  membershipDisplayPrice,
+  membershipPriceBreakdown,
+  resolveAppmallAmountPaise,
 } from '../../lib/courses';
 import { BUNDLE_COURSE_SLUG } from '../../lib/appmallOffer';
 
@@ -33,8 +36,16 @@ function makeTokenVerificationError(reason) {
 }
 
 export async function getServerSideProps({ query }) {
-  const { purchaseId, token, payment_retry } = query;
+  const { purchaseId, token, payment_retry, amount, course_id, course } = query;
   const paymentRetry = payment_retry === '1';
+  const courseSlug = typeof course_id === 'string' ? course_id : typeof course === 'string' ? course : BUNDLE_COURSE_SLUG;
+  const amountPaise = resolveAppmallAmountPaise(courseSlug, amount);
+  const isAstroPack = courseSlug === 'astro-question' || courseSlug === 'janam-kundli';
+  const displayPrice = isAstroPack ? '₹116.82' : membershipDisplayPrice();
+  const priceBreakdown = isAstroPack
+    ? '(₹99 + 18% GST) — Astro Ask Questions pack'
+    : membershipPriceBreakdown();
+  const validityText = isAstroPack ? '10 AI questions' : '12 Months';
 
   if (!token) {
     return {
@@ -63,6 +74,10 @@ export async function getServerSideProps({ query }) {
         rawToken: token,
         purchaseId: payload.purchaseId,
         paymentRetry,
+        amountPaise,
+        displayPrice,
+        priceBreakdown,
+        validityText,
       },
     };
   } catch (err) {
@@ -77,7 +92,13 @@ export async function getServerSideProps({ query }) {
           : err.message || 'Unknown verification error.';
 
     return {
-      props: { tokenError: makeTokenVerificationError(reason) },
+      props: {
+        tokenError: makeTokenVerificationError(reason),
+        amountPaise,
+        displayPrice,
+        priceBreakdown,
+        validityText,
+      },
     };
   }
 }
@@ -88,6 +109,10 @@ export default function AppMallPaymentsPage({
   purchaseId,
   tokenError,
   paymentRetry,
+  amountPaise,
+  displayPrice,
+  priceBreakdown,
+  validityText,
 }) {
   return (
     <SegmentPaymentPage
@@ -100,7 +125,7 @@ export default function AppMallPaymentsPage({
       accentGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
       accentColor="#667eea"
       accentDisabled="#a5b4fc"
-      validityText="12 + 1 Months"
+      validityText={validityText || '12 Months'}
       validityLabel={MEMBERSHIP_TAGLINE}
       features={CURRENT_BUNDLE.features}
       limitedTimeNotice={MEMBERSHIP_LIMITED_TIME_NOTICE}
@@ -112,8 +137,9 @@ export default function AppMallPaymentsPage({
       tokenError={tokenError || null}
       fixedCourseLabel="App-Mall Membership — All Apps"
       paymentCourse={BUNDLE_COURSE_SLUG}
-      displayPrice="₹116.82"
-      priceBreakdown="(₹99 + 18% GST) — limited time"
+      displayPrice={displayPrice || membershipDisplayPrice()}
+      priceBreakdown={priceBreakdown || membershipPriceBreakdown()}
+      amountPaise={amountPaise || undefined}
       paymentRetry={paymentRetry}
     />
   );

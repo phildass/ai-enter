@@ -117,11 +117,11 @@ export default function PaymentSuccess() {
 
           {isCapturedSuccess && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: '#374151' }}>
-            <p>✅ Membership AppMall Validity: 12 + 1 Month, Amount Rs 116.82</p>
+            <p>✅ Membership AppMall Validity: 12-Month, Amount Rs 588.82 — 1 + 1 for the price of one</p>
             <p>✅ Access Valid for {appDetails.validity}</p>
             <p>✅ All App-Mall apps included</p>
             <p style={{ fontWeight: 700, color: '#b91c1c', textTransform: 'uppercase', fontSize: '0.75rem' }}>
-              This Rs 99 membership fee is for a limited time only and can be changed at any moment.
+              1 + 1 for the price of one — 12-Month membership Rs 499 + 18% GST (Rs 588.82).
             </p>
           </div>
           )}

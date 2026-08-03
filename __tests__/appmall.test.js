@@ -45,8 +45,8 @@ function buildJwt(payload, secret) {
 (function testSignatureExactness() {
   const secret = 'test-signing-secret';
 
-  // APPMALL_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
-  const DEFAULT_AMOUNT_PAISE = 11682;
+  // APPMALL_DEFAULT_AMOUNT_PAISE = 58882 (₹499 + 18% GST = ₹588.82)
+  const DEFAULT_AMOUNT_PAISE = 58882;
 
   const payload = {
     purchaseId: 'purchase-123',
@@ -76,7 +76,7 @@ function buildJwt(payload, secret) {
   assert.notStrictEqual(sig1, sig3, 'Different secret must produce different signature');
 
   // Different body → different signature (no re-stringify mismatch)
-  const rawBody2 = JSON.stringify({ ...payload, amountPaise: 11683 });
+  const rawBody2 = JSON.stringify({ ...payload, amountPaise: 58883 });
   const sig4 = computeConfirmSignature(rawBody2, secret);
   assert.notStrictEqual(sig1, sig4, 'Different body must produce different signature');
 
@@ -99,8 +99,8 @@ function buildJwt(payload, secret) {
     'event',
   ];
 
-  // APPMALL_DEFAULT_AMOUNT_PAISE = 11682 (₹99 + 18% GST = ₹116.82)
-  const DEFAULT_AMOUNT_PAISE = 11682;
+  // APPMALL_DEFAULT_AMOUNT_PAISE = 58882 (₹499 + 18% GST = ₹588.82)
+  const DEFAULT_AMOUNT_PAISE = 58882;
 
   const confirmPayload = {
     purchaseId: 'purchase-123',
