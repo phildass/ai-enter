@@ -88,9 +88,20 @@ export async function getServerSideProps({ query }) {
       });
     }
 
+    const queryName = typeof query.user_name === 'string' ? query.user_name.trim() : '';
+    const queryPhone = typeof query.phone === 'string' ? query.phone.trim() : '';
+    const queryEmail = typeof query.email === 'string' ? query.email.trim() : '';
+
     return {
       props: {
-        tokenPayload: payload,
+        tokenPayload: {
+          ...payload,
+          name: payload.name || queryName || null,
+          user_name: payload.user_name || queryName || payload.name || null,
+          phone: payload.phone || queryPhone || null,
+          email: payload.email || queryEmail || null,
+          user_email: payload.user_email || payload.email || queryEmail || null,
+        },
         rawToken: token,
         purchaseId: payload.purchaseId,
         paymentRetry,

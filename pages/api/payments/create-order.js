@@ -41,7 +41,13 @@ export default async function handler(req, res) {
       extractCustomerPhone({ customer_phone: req.body.customer_phone }) ||
       extractCustomerPhone(payload) ||
       null;
-    customer_name = payload.name || payload.customer_name || null;
+    customer_name =
+      payload.name ||
+      payload.customer_name ||
+      payload.user_name ||
+      payload.full_name ||
+      payload.fullName ||
+      null;
     user_email = payload.user_email || payload.email || null;
     app_name = 'appmall';
     course = resolveAppmallCourseSlug(req.body.course || payload.courseSlug);

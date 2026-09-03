@@ -96,6 +96,30 @@ function extractTokenPhone(tokenPayload) {
   return digits.length >= 10 ? digits.slice(-10) : '';
 }
 
+function extractQueryPhone(query) {
+  if (!query) return '';
+  return extractTokenPhone({
+    phone: query.phone,
+    user_phone: query.user_phone,
+    contact: query.contact,
+  });
+}
+
+function extractTokenName(tokenPayload, query) {
+  const fromQuery =
+    (typeof query?.user_name === 'string' && query.user_name) ||
+    (typeof query?.name === 'string' && query.name) ||
+    '';
+  const raw =
+    tokenPayload?.name ||
+    tokenPayload?.customer_name ||
+    tokenPayload?.user_name ||
+    tokenPayload?.full_name ||
+    tokenPayload?.fullName ||
+    fromQuery;
+  return String(raw || '').trim();
+}
+
 function fetchWithTimeout(url, options) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
@@ -224,6 +248,8 @@ export default function SegmentPaymentPage({
   const userEmail = tokenPayload
     ? userEmailFromToken
     : (typeof router.query.email === 'string' ? router.query.email : undefined);
+  const queryEmail =
+    typeof router.query.email === 'string' ? router.query.email.trim() : '';
 
   // purchaseId may be in the URL (?purchaseId=) or embedded in the JWT.
   const purchaseId =
@@ -435,12 +461,11 @@ export default function SegmentPaymentPage({
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   useEffect(() => {
-    if (!tokenPayload) return;
-    const tokenPhone = extractTokenPhone(tokenPayload);
+    const tokenPhone = extractTokenPhone(tokenPayload) || extractQueryPhone(router.query);
     if (tokenPhone && !phone) {
       setPhone(tokenPhone);
     }
-  }, [tokenPayload, phone]);
+  }, [tokenPayload, phone, router.query]);
 
   const canSubmitCustomerDetails = useMemo(() => {
     if (!allowedCourses) return true;
@@ -454,8 +479,11 @@ export default function SegmentPaymentPage({
   const activeTokenKind = tokenKind || (segmentKey === 'appmall' ? 'appmall' : 'session');
   const isExternalTokenSegment =
     activeTokenKind === 'appmall' && !!rawToken;
-  const tokenPhone = extractTokenPhone(tokenPayload);
+  const tokenPhone =
+    extractTokenPhone(tokenPayload) || extractQueryPhone(router.query);
   const needsPhoneInput = isExternalTokenSegment && activeTokenKind === 'appmall' && !tokenPhone;
+  const showIdentityForm =
+    !isExternalTokenSegment && !!allowedCourses && router.isReady;
   const isAppmallHandoff =
     segmentKey === 'appmall' && activeTokenKind === 'appmall' && !!rawToken;
   // Mobile UPI intent: modal closes when the UPI app opens and Razorpay cancels the payment.
@@ -606,16 +634,19 @@ export default function SegmentPaymentPage({
           : `${window.location.origin}/api/payments/razorpay-callback`;
 
       const prefill = {};
-      const contactPhone = extractTokenPhone(tokenPayload) || phone.trim();
+      const contactPhone =
+        extractTokenPhone(tokenPayload) || extractQueryPhone(router.query) || phone.trim();
       if (contactPhone) prefill.contact = contactPhone;
-      if (tokenPayload?.name || tokenPayload?.customer_name) {
-        prefill.name = tokenPayload.name || tokenPayload.customer_name;
-      }
+      const payerName = extractTokenName(tokenPayload, router.query);
+      if (payerName) prefill.name = payerName;
       // Receipt email must be this payment session's email only — never leave blank
       // (blank lets Razorpay/browser autofill another account, e.g. merchant email).
-      const sessionEmail = (userEmailFromToken || userEmail || '').trim();
+      const sessionEmail = (userEmailFromToken || userEmail || queryEmail || '').trim();
       if (sessionEmail) prefill.email = sessionEmail;
       const readonlyPrefill = sessionEmail ? { email: true } : undefined;
+      const hiddenPrefill = {};
+      if (prefill.email) hiddenPrefill.email = true;
+      if (prefill.contact) hiddenPrefill.contact = true;
 
       // Full-page Razorpay redirect checkout (mobile UPI).
       if (usesRedirectCheckout) {
@@ -659,6 +690,7 @@ export default function SegmentPaymentPage({
           retry: { enabled: false },
           ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
           ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
+          ...(Object.keys(hiddenPrefill).length > 0 ? { hidden: hiddenPrefill } : {}),
           ...(isAppmallHandoff && isMobileCheckout()
             ? {
                 config: {
@@ -725,6 +757,7 @@ export default function SegmentPaymentPage({
         retry: { enabled: false },
         ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
         ...(readonlyPrefill ? { readonly: readonlyPrefill } : {}),
+        ...(Object.keys(hiddenPrefill).length > 0 ? { hidden: hiddenPrefill } : {}),
         ...(mobileRedirectCheckout ? { callback_url: callbackUrl, redirect: true } : {}),
 
         ...(!usesAppmallModalCheckout
@@ -1048,7 +1081,7 @@ export default function SegmentPaymentPage({
     processing ||
     !courseAllowed ||
     (needsPhoneInput && !PHONE_RE.test(phone.trim())) ||
-    (allowedCourses && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
+    (showIdentityForm && !fixedCourseLabel && (!selectedOrQueryCourse || !canSubmitCustomerDetails));
 
   const payButtonDisabled = disablePay || isInitiating;
 
@@ -1212,7 +1245,7 @@ export default function SegmentPaymentPage({
             </div>
           )}
 
-          {allowedCourses && router.isReady && (
+          {showIdentityForm && (
             <div style={{ marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <div style={{ flex: 1 }}>
