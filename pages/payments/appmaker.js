@@ -3,10 +3,8 @@ import { verifyAppmallToken } from '../../lib/verifyAppmallToken';
 import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePendingPayment';
 import {
   APPMALL_ALLOWED_COURSES,
-  APPMAKER_AMOUNT_PAISE,
-  APPMAKER_DISPLAY_PRICE,
-  APPMAKER_PRICE_BREAKDOWN,
-  APPMAKER_VALIDITY_TEXT,
+  isAppmakerManualCourse,
+  resolveAppmakerManualPricing,
 } from '../../lib/courses';
 
 const NO_TOKEN_ERROR = {
@@ -32,22 +30,23 @@ function makeTokenVerificationError(reason) {
   };
 }
 
+function courseFromQuery(query) {
+  const fromCourseId = typeof query.course_id === 'string' ? query.course_id.trim() : '';
+  const fromCourse = typeof query.course === 'string' ? query.course.trim() : '';
+  const fromSource = typeof query.source === 'string' ? query.source.trim() : '';
+  return fromCourseId || fromCourse || fromSource || 'appmaker';
+}
+
 export async function getServerSideProps({ query }) {
   const { purchaseId, token, payment_retry } = query;
   const paymentRetry = payment_retry === '1';
-  const amountPaise = APPMAKER_AMOUNT_PAISE;
-  const displayPrice = APPMAKER_DISPLAY_PRICE;
-  const priceBreakdown = APPMAKER_PRICE_BREAKDOWN;
-  const validityText = APPMAKER_VALIDITY_TEXT;
+  let pricing = resolveAppmakerManualPricing(courseFromQuery(query));
 
   if (!token) {
     return {
       props: {
         tokenError: NO_TOKEN_ERROR,
-        amountPaise,
-        displayPrice,
-        priceBreakdown,
-        validityText,
+        ...pricing,
       },
     };
   }
@@ -55,29 +54,25 @@ export async function getServerSideProps({ query }) {
   try {
     const payload = verifyAppmallToken(token, { expectedPurchaseId: purchaseId });
 
-    if (!APPMALL_ALLOWED_COURSES.includes(payload.courseSlug) && payload.courseSlug !== 'appmaker') {
+    if (!APPMALL_ALLOWED_COURSES.includes(payload.courseSlug)) {
       return {
         props: {
           tokenError: makeTokenVerificationError(`Course "${payload.courseSlug}" is not available.`),
-          amountPaise,
-          displayPrice,
-          priceBreakdown,
-          validityText,
+          ...pricing,
         },
       };
     }
 
-    if (payload.courseSlug && payload.courseSlug !== 'appmaker') {
+    if (!isAppmakerManualCourse(payload.courseSlug)) {
       return {
         props: {
           tokenError: makeTokenVerificationError("This checkout is only for The App Maker's Manual."),
-          amountPaise,
-          displayPrice,
-          priceBreakdown,
-          validityText,
+          ...pricing,
         },
       };
     }
+
+    pricing = resolveAppmakerManualPricing(payload.courseSlug);
 
     if (paymentRetry) {
       await invalidatePendingPaymentTransaction({
@@ -103,10 +98,7 @@ export async function getServerSideProps({ query }) {
         rawToken: token,
         purchaseId: payload.purchaseId,
         paymentRetry,
-        amountPaise,
-        displayPrice,
-        priceBreakdown,
-        validityText,
+        ...pricing,
       },
     };
   } catch (err) {
@@ -123,10 +115,7 @@ export async function getServerSideProps({ query }) {
     return {
       props: {
         tokenError: makeTokenVerificationError(reason),
-        amountPaise,
-        displayPrice,
-        priceBreakdown,
-        validityText,
+        ...pricing,
       },
     };
   }
@@ -137,11 +126,16 @@ export default function AppMakerPaymentsPage({
   rawToken,
   tokenError,
   paymentRetry,
+  course,
   amountPaise,
   displayPrice,
   priceBreakdown,
   validityText,
+  fixedCourseLabel,
+  description,
+  features,
 }) {
+  const pricing = resolveAppmakerManualPricing(course);
   return (
     <SegmentPaymentPage
       segmentKey="appmall"
@@ -153,27 +147,21 @@ export default function AppMakerPaymentsPage({
       accentGradient="linear-gradient(135deg, #b45309 0%, #1f4b7a 100%)"
       accentColor="#b45309"
       accentDisabled="#94a3b8"
-      validityText={validityText || "1-year App Maker's Manual"}
+      validityText={validityText || pricing.validityText}
       validityLabel="The App Maker's Manual — 1 year"
-      features={[
-        'Online reader with index and chapter links',
-        'Google Translate — read in any language',
-        'One download (English PDF or translated HTML)',
-        'One admin-answered query (max 100 words, 24–72 hours)',
-        'Not App Mall suite membership',
-      ]}
+      features={features || pricing.features}
       limitedTimeNotice="Refund only if unused download, online-only, within 1 hour of purchase."
       originDomain="appmaker.appmall.in"
-      description="The App Maker's Manual — 1-year ebook membership"
+      description={description || pricing.description}
       tokenKind="appmall"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}
       tokenError={tokenError || null}
-      fixedCourseLabel="App Maker's Manual — ₹590 (incl. GST)"
-      paymentCourse="appmaker"
-      displayPrice={displayPrice || APPMAKER_DISPLAY_PRICE}
-      priceBreakdown={priceBreakdown || APPMAKER_PRICE_BREAKDOWN}
-      amountPaise={amountPaise || APPMAKER_AMOUNT_PAISE}
+      fixedCourseLabel={fixedCourseLabel || pricing.fixedCourseLabel}
+      paymentCourse={course || pricing.course}
+      displayPrice={displayPrice || pricing.displayPrice}
+      priceBreakdown={priceBreakdown || pricing.priceBreakdown}
+      amountPaise={amountPaise || pricing.amountPaise}
       paymentRetry={paymentRetry}
     />
   );

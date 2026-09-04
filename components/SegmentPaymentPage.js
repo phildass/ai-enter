@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { buildAppmallRazorpayCallbackUrl } from '../lib/appmallCallbackUrl';
+import { membershipDisplayPrice, membershipPriceBreakdown } from '../lib/courses';
 
 // appmall: modal checkout (no redirect) — browser callback on authorize kills UPI intent.
 // Capture verified server-side via resume-payment / webhook.
@@ -1106,15 +1107,15 @@ export default function SegmentPaymentPage({
         return isInitiating || processing
           ? statusText || 'Processing…'
           : segmentKey === 'appmall'
-            ? `Submit — ${displayPrice || '₹588.82'}`
-            : `Pay ${displayPrice || '₹588.82'}`;
+            ? `Submit — ${displayPrice || membershipDisplayPrice()}`
+            : `Pay ${displayPrice || membershipDisplayPrice()}`;
     }
   })();
 
   return (
     <>
       <Head>
-        <title>{brandName} Payment - {displayPrice || '₹588.82'}</title>
+        <title>{brandName} Payment - {displayPrice || membershipDisplayPrice()}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </Head>
 
@@ -1342,11 +1343,11 @@ export default function SegmentPaymentPage({
             </p>
 
             <div style={{ marginBottom: '0.25rem' }}>
-              <span style={{ fontSize: '3rem', fontWeight: 700 }}>{displayPrice || '₹588.82'}</span>
+              <span style={{ fontSize: '3rem', fontWeight: 700 }}>{displayPrice || membershipDisplayPrice()}</span>
             </div>
 
             <p style={{ fontSize: '0.8rem', opacity: 0.85, marginBottom: '1rem' }}>
-              {priceBreakdown || '(₹499 + 18% GST) — 1 + 1 for the price of one'}
+              {priceBreakdown || membershipPriceBreakdown()}
             </p>
 
             {limitedTimeNotice ? (
