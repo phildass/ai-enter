@@ -6,6 +6,8 @@ import {
   CURRENT_BUNDLE,
   MEMBERSHIP_LIMITED_TIME_NOTICE,
   MEMBERSHIP_TAGLINE,
+  ASTRO_QUESTION_PRICE_EXCL_GST,
+  ASTRO_QUESTION_PRICE_INCL_GST,
   membershipDisplayPrice,
   membershipPriceBreakdown,
   resolveAppmallAmountPaise,
@@ -41,9 +43,11 @@ export async function getServerSideProps({ query }) {
   const courseSlug = typeof course_id === 'string' ? course_id : typeof course === 'string' ? course : BUNDLE_COURSE_SLUG;
   const amountPaise = resolveAppmallAmountPaise(courseSlug, amount);
   const isAstroPack = courseSlug === 'astro-question' || courseSlug === 'janam-kundli';
-  const displayPrice = isAstroPack ? '₹116.82' : membershipDisplayPrice();
+  const displayPrice = isAstroPack
+    ? `₹${ASTRO_QUESTION_PRICE_INCL_GST.toFixed(2)}`
+    : membershipDisplayPrice();
   const priceBreakdown = isAstroPack
-    ? '(₹99 + 18% GST) — Astro Ask Questions pack'
+    ? `(₹${ASTRO_QUESTION_PRICE_EXCL_GST} + 18% GST) — Astro Ask Questions pack`
     : membershipPriceBreakdown();
   const validityText = isAstroPack ? '10 AI questions' : '12 Months';
 
