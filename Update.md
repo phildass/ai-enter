@@ -1,4 +1,10 @@
-## AI-Enter: Comprehensive Documentation
+## [2026-09-17] — Festival Rs 116 (through 30 Sep); IG discounted page retired
+
+Appmall suite on `/payments/appmall` now accepts **11600 paise** from the signed JWT / `amount=116` query (festival through 30 Sep 2026 IST). Display copy is festival Rs 116 including Manual + App Builder. From 1 Oct: Rs 500 + 18% GST (Rs 590) for every app. Create-order prefers the signed JWT amount over the page body (and will not reuse a pending Razorpay order at a different amount), so Razorpay cannot silently stay at Rs 590. `/payments/discounted` redirects to https://appmall.in/pay.
+
+---
+
+
 
 ### 📋 Project Overview
 

@@ -4,12 +4,14 @@ import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePending
 import {
   APPMALL_ALLOWED_COURSES,
   CURRENT_BUNDLE,
-  MEMBERSHIP_LIMITED_TIME_NOTICE,
-  MEMBERSHIP_TAGLINE,
   ASTRO_QUESTION_PRICE_EXCL_GST,
   ASTRO_QUESTION_PRICE_INCL_GST,
+  displayPriceForAmountPaise,
+  getMembershipLimitedTimeNotice,
+  getMembershipTagline,
   membershipDisplayPrice,
   membershipPriceBreakdown,
+  priceBreakdownForAmountPaise,
   resolveAppmallAmountPaise,
 } from '../../lib/courses';
 import { BUNDLE_COURSE_SLUG } from '../../lib/appmallOffer';
@@ -38,22 +40,16 @@ function makeTokenVerificationError(reason) {
 }
 
 export async function getServerSideProps({ query }) {
-  const { purchaseId, token, payment_retry, amount, course_id, course } = query;
+  const { purchaseId, token, payment_retry, amount, course_id, course, offer } = query;
   const paymentRetry = payment_retry === '1';
   const courseSlug = typeof course_id === 'string' ? course_id : typeof course === 'string' ? course : BUNDLE_COURSE_SLUG;
-  const amountPaise = resolveAppmallAmountPaise(courseSlug, amount);
+  const offerVal = typeof offer === 'string' ? offer : '';
   const isAstroPack = courseSlug === 'astro-question' || courseSlug === 'janam-kundli';
-  const displayPrice = isAstroPack
-    ? `₹${ASTRO_QUESTION_PRICE_INCL_GST.toFixed(2)}`
-    : membershipDisplayPrice();
-  const priceBreakdown = isAstroPack
-    ? `(₹${ASTRO_QUESTION_PRICE_EXCL_GST} + 18% GST) — Astro Ask Questions pack`
-    : membershipPriceBreakdown();
-  const validityText = isAstroPack ? '10 AI questions' : '12 Months';
 
   if (!token) {
+    const amountPaise = resolveAppmallAmountPaise(courseSlug, amount, { offer: offerVal });
     return {
-      props: { tokenError: NO_TOKEN_ERROR },
+      props: { tokenError: NO_TOKEN_ERROR, amountPaise },
     };
   }
 
@@ -64,6 +60,24 @@ export async function getServerSideProps({ query }) {
       console.error('[appmall-payments] Course not in allowed list:', payload.courseSlug);
       return { props: { tokenError: makeTokenVerificationError(`Course "${payload.courseSlug}" is not available.`) } };
     }
+
+    const amountPaise = resolveAppmallAmountPaise(
+      payload.courseSlug || courseSlug,
+      amount ?? payload.amount_incl_gst,
+      {
+        offer: offerVal || payload.offer,
+        amountPaise: payload.amount_paise || payload.amountPaise,
+      },
+    );
+    const displayPrice = isAstroPack
+      ? `₹${ASTRO_QUESTION_PRICE_INCL_GST.toFixed(2)}`
+      : displayPriceForAmountPaise(amountPaise);
+    const priceBreakdown = isAstroPack
+      ? `(₹${ASTRO_QUESTION_PRICE_EXCL_GST} + 18% GST) — Astro Ask Questions pack`
+      : priceBreakdownForAmountPaise(amountPaise);
+    const validityText = isAstroPack ? '10 AI questions' : '12 Months';
+    const membershipTagline = getMembershipTagline();
+    const limitedTimeNotice = getMembershipLimitedTimeNotice();
 
     if (paymentRetry) {
       await invalidatePendingPaymentTransaction({
@@ -82,6 +96,8 @@ export async function getServerSideProps({ query }) {
         displayPrice,
         priceBreakdown,
         validityText,
+        membershipTagline,
+        limitedTimeNotice,
       },
     };
   } catch (err) {
@@ -95,13 +111,16 @@ export async function getServerSideProps({ query }) {
           ? 'Payment server is not properly configured. Please contact support.'
           : err.message || 'Unknown verification error.';
 
+    const amountPaise = resolveAppmallAmountPaise(courseSlug, amount, { offer: offerVal });
     return {
       props: {
         tokenError: makeTokenVerificationError(reason),
         amountPaise,
-        displayPrice,
-        priceBreakdown,
-        validityText,
+        displayPrice: displayPriceForAmountPaise(amountPaise),
+        priceBreakdown: priceBreakdownForAmountPaise(amountPaise),
+        validityText: '12 Months',
+        membershipTagline: getMembershipTagline(),
+        limitedTimeNotice: getMembershipLimitedTimeNotice(),
       },
     };
   }
@@ -117,7 +136,10 @@ export default function AppMallPaymentsPage({
   displayPrice,
   priceBreakdown,
   validityText,
+  membershipTagline,
+  limitedTimeNotice,
 }) {
+  const tagline = membershipTagline || getMembershipTagline();
   return (
     <SegmentPaymentPage
       segmentKey="appmall"
@@ -130,11 +152,11 @@ export default function AppMallPaymentsPage({
       accentColor="#667eea"
       accentDisabled="#a5b4fc"
       validityText={validityText || '12 Months'}
-      validityLabel={MEMBERSHIP_TAGLINE}
+      validityLabel={tagline}
       features={CURRENT_BUNDLE.features}
-      limitedTimeNotice={MEMBERSHIP_LIMITED_TIME_NOTICE}
+      limitedTimeNotice={limitedTimeNotice || getMembershipLimitedTimeNotice()}
       originDomain="appmall.in"
-      description={MEMBERSHIP_TAGLINE}
+      description={tagline}
       tokenKind="appmall"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}

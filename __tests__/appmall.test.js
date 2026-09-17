@@ -45,8 +45,8 @@ function buildJwt(payload, secret) {
 (function testSignatureExactness() {
   const secret = 'test-signing-secret';
 
-  // APPMALL_DEFAULT_AMOUNT_PAISE = 59000 (₹500 + 18% GST = ₹590)
-  const DEFAULT_AMOUNT_PAISE = 59000;
+  // Festival suite amount is 11600 paise; post-1 Oct standard is 59000.
+  const DEFAULT_AMOUNT_PAISE = 11600;
 
   const payload = {
     purchaseId: 'purchase-123',
@@ -99,8 +99,8 @@ function buildJwt(payload, secret) {
     'event',
   ];
 
-  // APPMALL_DEFAULT_AMOUNT_PAISE = 59000 (₹500 + 18% GST = ₹590)
-  const DEFAULT_AMOUNT_PAISE = 59000;
+  // Festival suite amount is 11600 paise; post-1 Oct standard is 59000.
+  const DEFAULT_AMOUNT_PAISE = 11600;
 
   const confirmPayload = {
     purchaseId: 'purchase-123',
@@ -232,6 +232,43 @@ function buildJwt(payload, secret) {
   assert.strictEqual(timestamp, String(value), 'timestamp must be a plain integer string');
 
   console.log('✓ x-aienter-timestamp: value is Unix epoch seconds');
+})();
+
+(function testFestivalAmountPaise() {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'courses.js'), 'utf8');
+
+  const FESTIVAL_AMOUNT_PAISE = 11600;
+  const STANDARD_AMOUNT_PAISE = 59000;
+  assert.notStrictEqual(
+    FESTIVAL_AMOUNT_PAISE,
+    STANDARD_AMOUNT_PAISE,
+    'Festival Rs 116 must not collide with standard Rs 590',
+  );
+  assert.strictEqual(Math.round(116 * 100), FESTIVAL_AMOUNT_PAISE);
+  assert.ok(
+    /FESTIVAL_MEMBERSHIP_AMOUNT_PAISE\s*=\s*11600/.test(src),
+    'courses.js must define festival amount as 11600 paise',
+  );
+  assert.ok(
+    /APPMALL_STANDARD_AMOUNT_PAISE\s*=\s*59000/.test(src),
+    'courses.js must define standard amount as 59000 paise',
+  );
+  assert.ok(
+    /n === FESTIVAL_MEMBERSHIP_AMOUNT_PAISE/.test(src),
+    'isAllowedAppmallAmountPaise must include 11600',
+  );
+
+  const endsAt = Date.parse('2026-09-30T18:29:59.999Z');
+  const after = Date.parse('2026-09-30T18:30:00.000Z');
+  assert.ok(endsAt < after, 'festival cutoff must precede 1 Oct 2026 IST');
+  assert.ok(
+    /2026-09-30T18:29:59\.999Z/.test(src),
+    'festival offer must end 30 Sep 2026 23:59 IST',
+  );
+
+  console.log('✓ festival amount: 11600 paise is distinct from 59000');
 })();
 
 // ---------------------------------------------------------------------------
