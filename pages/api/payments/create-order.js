@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
-import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, isAllowedAppmallAmountPaise, isAllowedInternationalCharge, isInternationalPaymentCourse, normalizeInternationalCurrency, resolveAppmallAmountPaise } from '../../../lib/courses';
+import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, isAllowedAppmallAmountPaise, isAllowedInternationalCharge, isInternationalPaymentCourse, resolveAppmallAmountPaise } from '../../../lib/courses';
 import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
@@ -69,18 +69,16 @@ export default async function handler(req, res) {
       String(req.body.offer || '').toLowerCase() === 'international';
 
     if (international) {
-      const signedCurrency = normalizeInternationalCurrency(payload.currency);
-      const signedMinor =
-        signedCurrency === 'USD'
-          ? Number(payload.amount_cents || payload.amount_paise || payload.amountPaise || 0)
-          : Number(payload.amount_paise || payload.amountPaise || 0);
-      if (!isAllowedInternationalCharge(signedMinor, signedCurrency)) {
+      const signedMinor = Number(
+        payload.amount_cents || payload.amount_paise || payload.amountPaise || 0,
+      );
+      if (!isAllowedInternationalCharge(signedMinor, 'USD')) {
         return res.status(400).json({
-          error: 'Invalid international amount. Allowed: INR 200 or USD 3.',
+          error: 'Invalid international amount. Allowed: USD 5 (500 cents) only.',
         });
       }
       amount_paise = signedMinor;
-      currency = signedCurrency;
+      currency = 'USD';
     } else {
     // Prefer signed JWT amount over req.body so Razorpay cannot stay at Rs 590
     // when the token is festival 11600 paise (the page body used to win).
@@ -297,10 +295,10 @@ export default async function handler(req, res) {
     const internationalOrder =
       isInternationalPaymentCourse(course) || String(currency || '').toUpperCase() === 'USD';
     if (internationalOrder) {
-      const finalCurrencyCheck = normalizeInternationalCurrency(currency);
-      if (!isAllowedInternationalCharge(amount_paise, finalCurrencyCheck)) {
+      currency = 'USD';
+      if (!isAllowedInternationalCharge(amount_paise, 'USD')) {
         return res.status(400).json({
-          error: 'Invalid international amount. Allowed: INR 200 or USD 3.',
+          error: 'Invalid international amount. Allowed: USD 5 (500 cents) only.',
         });
       }
     }

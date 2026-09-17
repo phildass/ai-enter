@@ -276,36 +276,42 @@ function buildJwt(payload, secret) {
   const path = require('path');
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'courses.js'), 'utf8');
 
-  const INR_PAISE = 20000;
-  const USD_CENTS = 300;
-  assert.strictEqual(Math.round(200 * 100), INR_PAISE);
-  assert.strictEqual(Math.round(3 * 100), USD_CENTS);
-  assert.notStrictEqual(INR_PAISE, 11600, 'International Rs 200 must not collide with festival Rs 116');
-  assert.notStrictEqual(INR_PAISE, 59000, 'International Rs 200 must not collide with standard Rs 590');
+  const USD_CENTS = 500;
+  assert.strictEqual(Math.round(5 * 100), USD_CENTS);
+  assert.notStrictEqual(USD_CENTS, 11600, 'International USD 5 must not collide with festival Rs 116');
+  assert.notStrictEqual(USD_CENTS, 59000, 'International USD 5 must not collide with standard Rs 590');
   assert.ok(
-    /INTERNATIONAL_AMOUNT_PAISE\s*=\s*20000/.test(src),
-    'courses.js must define international INR as 20000 paise',
+    /INTERNATIONAL_AMOUNT_CENTS\s*=\s*500/.test(src),
+    'courses.js must define international USD as 500 cents',
   );
   assert.ok(
-    /INTERNATIONAL_AMOUNT_CENTS\s*=\s*300/.test(src),
-    'courses.js must define international USD as 300 cents',
+    /INTERNATIONAL_PRICE_USD\s*=\s*5/.test(src),
+    'courses.js must define international price as USD 5',
+  );
+  assert.ok(
+    !/INTERNATIONAL_AMOUNT_PAISE\s*=\s*20000/.test(src),
+    'courses.js must not keep INR 20000 as the international amount',
   );
   assert.ok(
     /INTERNATIONAL_COURSE_ID\s*=\s*'international-course'/.test(src),
     'courses.js must define international-course id',
   );
   assert.ok(
-    /isAllowedInternationalCharge/.test(src),
-    'courses.js must allowlist international charges separately from festival/standard',
+    /n === INTERNATIONAL_AMOUNT_CENTS/.test(src),
+    'isAllowedInternationalCharge must allowlist 500 cents USD',
   );
   assert.ok(
-    !/n === INTERNATIONAL_AMOUNT_PAISE/.test(src.split('function isAllowedAppmallAmountPaise')[1].split('function isInternationalPaymentCourse')[0]),
-    'isAllowedAppmallAmountPaise must not accept 20000 (foriegn path only)',
+    !/n === INTERNATIONAL_AMOUNT_PAISE/.test(
+      src.split('function isAllowedAppmallAmountPaise')[1].split('function isInternationalPaymentCourse')[0],
+    ),
+    'isAllowedAppmallAmountPaise must not accept the international amount',
   );
 
   const page = fs.readFileSync(path.join(__dirname, '..', 'pages', 'payments', 'foriegn.js'), 'utf8');
   assert.ok(page.includes('International buyers'), 'foriegn page must describe international buyers');
+  assert.ok(page.includes('all inclusive'), 'foriegn page must say all inclusive');
   assert.ok(page.includes('INTERNATIONAL_COURSE_ID'), 'foriegn page must charge international-course');
+  assert.ok(!page.includes('Rs 200'), 'foriegn page must not show Rs 200');
 
   const redirectPage = fs.readFileSync(path.join(__dirname, '..', 'pages', 'payments', 'foreign.js'), 'utf8');
   assert.ok(redirectPage.includes('/payments/foriegn'), 'foreign spelling must redirect to foriegn');
@@ -315,9 +321,10 @@ function buildJwt(payload, secret) {
     'utf8',
   );
   assert.ok(createOrder.includes('isAllowedInternationalCharge'), 'create-order must allowlist international amounts');
-  assert.ok(createOrder.includes("currency = signedCurrency"), 'create-order must pass JWT currency including USD');
+  assert.ok(createOrder.includes("currency = 'USD'"), 'create-order must force USD for international');
+  assert.ok(createOrder.includes('500 cents'), 'create-order error must mention 500 cents');
 
-  console.log('✓ international amount: 20000 paise INR and 300 cents USD');
+  console.log('✓ international amount: 500 cents USD only');
 })();
 
 // ---------------------------------------------------------------------------

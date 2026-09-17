@@ -1,6 +1,6 @@
-## [2026-09-17] — International buyers Rs 200 / USD 3 (`/payments/foriegn`)
+## [2026-09-17] — International buyers USD 5 all-inclusive (`/payments/foriegn`)
 
-New signed checkout page **`/payments/foriegn`** (owner spelling). International SKU is **20000 paise INR** or **300 cents USD** from the JWT (`amount_paise` / `amount_cents` + `currency`). Those amounts are allowlisted on this path only so Razorpay cannot fall back to Rs 590 / Rs 116. Copy is a single International buyers option (Rs 200 or USD 3), not a multi-product chooser. `create-order` passes USD when the signed token says USD (Razorpay international settlement must be enabled on the account; if the account is INR-only, Razorpay will reject USD orders). `/payments/foreign` redirects to `/payments/foriegn`.
+New signed checkout page **`/payments/foriegn`** (owner spelling). International SKU is **USD 5 all-inclusive (500 cents)** from the JWT (`amount_cents` / `amount_paise` + `currency=USD`). That amount is allowlisted on this path only so Razorpay cannot fall back to Rs 590 / Rs 116 / INR 200. Copy is a single International buyers option at $5.00 all-inclusive. `create-order` forces USD (Razorpay international settlement must be enabled on the account; if the account is INR-only, Razorpay will reject USD orders). `/payments/foreign` redirects to `/payments/foriegn`.
 
 ---
 

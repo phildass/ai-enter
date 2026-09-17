@@ -4,13 +4,19 @@ import { invalidatePendingPaymentTransaction } from '../../lib/invalidatePending
 import {
   APPMALL_ALLOWED_COURSES,
   CURRENT_BUNDLE,
-  INTERNATIONAL_AMOUNT_PAISE,
+  INTERNATIONAL_AMOUNT_CENTS,
   INTERNATIONAL_COURSE_ID,
-  INTERNATIONAL_PRICE_INR,
   INTERNATIONAL_PRICE_USD,
   isInternationalPaymentCourse,
   resolveInternationalCharge,
 } from '../../lib/courses';
+
+const DISPLAY_PRICE = `$${INTERNATIONAL_PRICE_USD}.00`;
+const TAGLINE = `International buyers — $${INTERNATIONAL_PRICE_USD} (all inclusive)`;
+const PRICE_BREAKDOWN =
+  `International buyers — $${INTERNATIONAL_PRICE_USD} (all inclusive). One 12-month membership: AppMall suite, The App Maker’s Manual download, and App Builder.`;
+const LIMITED_NOTICE =
+  `USD ${INTERNATIONAL_PRICE_USD} all-inclusive. Same entitlements as AppMall suite membership.`;
 
 const NO_TOKEN_ERROR = {
   title: 'Payment Link Required',
@@ -62,11 +68,8 @@ export async function getServerSideProps({ query }) {
       props: {
         tokenError: NO_TOKEN_ERROR,
         amountPaise: charge.amountMinor,
-        displayPrice:
-          charge.currency === 'USD'
-            ? `USD ${INTERNATIONAL_PRICE_USD}.00`
-            : `Rs ${INTERNATIONAL_PRICE_INR}.00`,
-        checkoutCurrency: charge.currency,
+        displayPrice: DISPLAY_PRICE,
+        checkoutCurrency: 'USD',
       },
     };
   }
@@ -105,12 +108,6 @@ export async function getServerSideProps({ query }) {
       { amount: amount ?? payload.amount_incl_gst, currency: payload.currency || currency },
     );
 
-    const displayPrice =
-      charge.currency === 'USD'
-        ? `USD ${INTERNATIONAL_PRICE_USD}.00`
-        : `Rs ${INTERNATIONAL_PRICE_INR}.00`;
-    const priceBreakdown = `International buyers — Rs ${INTERNATIONAL_PRICE_INR} (or USD ${INTERNATIONAL_PRICE_USD}). One 12-month membership: AppMall suite, The App Maker’s Manual download, and App Builder.`;
-
     if (paymentRetry) {
       await invalidatePendingPaymentTransaction({
         appName: 'appmall',
@@ -125,12 +122,12 @@ export async function getServerSideProps({ query }) {
         purchaseId: payload.purchaseId,
         paymentRetry,
         amountPaise: charge.amountMinor,
-        displayPrice,
-        priceBreakdown,
+        displayPrice: DISPLAY_PRICE,
+        priceBreakdown: PRICE_BREAKDOWN,
         validityText: '12 Months',
-        checkoutCurrency: charge.currency,
-        membershipTagline: `International buyers — Rs ${INTERNATIONAL_PRICE_INR} (or USD ${INTERNATIONAL_PRICE_USD})`,
-        limitedTimeNotice: `Pay Rs ${INTERNATIONAL_PRICE_INR} in INR, or USD ${INTERNATIONAL_PRICE_USD} as the only alternative. Same entitlements as AppMall suite membership.`,
+        checkoutCurrency: 'USD',
+        membershipTagline: TAGLINE,
+        limitedTimeNotice: LIMITED_NOTICE,
       },
     };
   } catch (err) {
@@ -149,11 +146,8 @@ export async function getServerSideProps({ query }) {
       props: {
         tokenError: makeTokenVerificationError(reason),
         amountPaise: charge.amountMinor,
-        displayPrice:
-          charge.currency === 'USD'
-            ? `USD ${INTERNATIONAL_PRICE_USD}.00`
-            : `Rs ${INTERNATIONAL_PRICE_INR}.00`,
-        checkoutCurrency: charge.currency,
+        displayPrice: DISPLAY_PRICE,
+        checkoutCurrency: 'USD',
       },
     };
   }
@@ -172,9 +166,7 @@ export default function InternationalPaymentsPage({
   membershipTagline,
   limitedTimeNotice,
 }) {
-  const tagline =
-    membershipTagline ||
-    `International buyers — Rs ${INTERNATIONAL_PRICE_INR} (or USD ${INTERNATIONAL_PRICE_USD})`;
+  const tagline = membershipTagline || TAGLINE;
   return (
     <SegmentPaymentPage
       segmentKey="appmall"
@@ -189,24 +181,18 @@ export default function InternationalPaymentsPage({
       validityText={validityText || '12 Months'}
       validityLabel={tagline}
       features={CURRENT_BUNDLE.features}
-      limitedTimeNotice={
-        limitedTimeNotice ||
-        `International buyers pay Rs ${INTERNATIONAL_PRICE_INR} (INR) or USD ${INTERNATIONAL_PRICE_USD}. Same suite, Manual, and App Builder.`
-      }
+      limitedTimeNotice={limitedTimeNotice || LIMITED_NOTICE}
       originDomain="appmall.in"
       description={tagline}
       tokenKind="appmall"
       tokenPayload={tokenPayload || null}
       rawToken={rawToken || null}
       tokenError={tokenError || null}
-      fixedCourseLabel={`International buyers — Rs ${INTERNATIONAL_PRICE_INR} (or USD ${INTERNATIONAL_PRICE_USD})`}
+      fixedCourseLabel={TAGLINE}
       paymentCourse={INTERNATIONAL_COURSE_ID}
-      displayPrice={displayPrice || `Rs ${INTERNATIONAL_PRICE_INR}.00`}
-      priceBreakdown={
-        priceBreakdown ||
-        `International buyers — Rs ${INTERNATIONAL_PRICE_INR} (or USD ${INTERNATIONAL_PRICE_USD})`
-      }
-      amountPaise={amountPaise || INTERNATIONAL_AMOUNT_PAISE}
+      displayPrice={displayPrice || DISPLAY_PRICE}
+      priceBreakdown={priceBreakdown || PRICE_BREAKDOWN}
+      amountPaise={amountPaise || INTERNATIONAL_AMOUNT_CENTS}
       paymentRetry={paymentRetry}
     />
   );
