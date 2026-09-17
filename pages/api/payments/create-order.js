@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
-import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, isAllowedAppmallAmountPaise, resolveAppmallAmountPaise } from '../../../lib/courses';
+import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, isAllowedAppmallAmountPaise, isAllowedInternationalCharge, isInternationalPaymentCourse, normalizeInternationalCurrency, resolveAppmallAmountPaise } from '../../../lib/courses';
 import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
@@ -63,6 +63,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Invalid course in token: ${course}` });
     }
 
+    const international =
+      isInternationalPaymentCourse(course) ||
+      payload.offer === 'international' ||
+      String(req.body.offer || '').toLowerCase() === 'international';
+
+    if (international) {
+      const signedCurrency = normalizeInternationalCurrency(payload.currency);
+      const signedMinor =
+        signedCurrency === 'USD'
+          ? Number(payload.amount_cents || payload.amount_paise || payload.amountPaise || 0)
+          : Number(payload.amount_paise || payload.amountPaise || 0);
+      if (!isAllowedInternationalCharge(signedMinor, signedCurrency)) {
+        return res.status(400).json({
+          error: 'Invalid international amount. Allowed: INR 200 or USD 3.',
+        });
+      }
+      amount_paise = signedMinor;
+      currency = signedCurrency;
+    } else {
     // Prefer signed JWT amount over req.body so Razorpay cannot stay at Rs 590
     // when the token is festival 11600 paise (the page body used to win).
     const signedPaise = Number(payload.amount_paise || payload.amountPaise || 0);
@@ -73,6 +92,7 @@ export default async function handler(req, res) {
           amountPaise: signedPaise,
         });
     currency = payload.currency || 'INR';
+    }
     validity_days =
       payload.pricing_tier === 'ig_disc_99' || payload.pricingTier === 'ig_disc_99'
         ? 395
@@ -206,17 +226,20 @@ export default async function handler(req, res) {
               const hasPriorAttempt = priorPayments.length > 0;
               const intendedAmountPaise = Number(amount_paise || getAppmallDefaultAmountPaise());
               const existingAmount = Number(existingOrder.amount);
+              const intendedCurrency = String(currency || 'INR').toUpperCase();
+              const existingCurrency = String(existingOrder.currency || 'INR').toUpperCase();
               const amountMismatch =
                 Number.isFinite(existingAmount) &&
                 Number.isFinite(intendedAmountPaise) &&
                 existingAmount !== intendedAmountPaise;
+              const currencyMismatch = existingCurrency !== intendedCurrency;
 
-              if (hasPriorAttempt || amountMismatch) {
+              if (hasPriorAttempt || amountMismatch || currencyMismatch) {
                 console.log(
                   `[create-order] not reusing order ${row.razorpay_order_id} — ${
                     hasPriorAttempt
                       ? 'prior payment attempts exist'
-                      : `amount ${existingAmount} != ${intendedAmountPaise}`
+                      : `amount/currency ${existingAmount} ${existingCurrency} != ${intendedAmountPaise} ${intendedCurrency}`
                   }`,
                 );
                 await supabase
@@ -271,7 +294,20 @@ export default async function handler(req, res) {
       }
     }
 
-    const finalAmountPaise = amount_paise || getAppmallDefaultAmountPaise();
+    const internationalOrder =
+      isInternationalPaymentCourse(course) || String(currency || '').toUpperCase() === 'USD';
+    if (internationalOrder) {
+      const finalCurrencyCheck = normalizeInternationalCurrency(currency);
+      if (!isAllowedInternationalCharge(amount_paise, finalCurrencyCheck)) {
+        return res.status(400).json({
+          error: 'Invalid international amount. Allowed: INR 200 or USD 3.',
+        });
+      }
+    }
+
+    const finalAmountPaise = internationalOrder
+      ? Number(amount_paise)
+      : amount_paise || getAppmallDefaultAmountPaise();
     const finalCurrency = currency || 'INR';
     const receiptSuffix = Date.now().toString(36);
 

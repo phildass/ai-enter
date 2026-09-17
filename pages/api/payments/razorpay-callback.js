@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import Razorpay from 'razorpay';
 import { createClient } from '@supabase/supabase-js';
 import { completeVerifiedPayment } from '../../../lib/completeVerifiedPayment';
+import { isInternationalPaymentCourse } from '../../../lib/courses';
 import { getRazorpayCredentialsForApp } from '../../../lib/payments';
 import { verifyPaymentLinkCallbackSignature } from '../../../lib/razorpayPaymentLink';
 import {
@@ -42,7 +43,9 @@ const SITE_BASE = (process.env.NEXT_PUBLIC_SITE_URL || 'https://aienter.in').rep
 
 function buildHandoffPaymentRetryUrl(transaction) {
   if (!transaction?.handoff_token || !transaction?.session_id) return null;
-  const path = '/payments/appmall';
+  const path = isInternationalPaymentCourse(transaction.course)
+    ? '/payments/foriegn'
+    : '/payments/appmall';
   const url = new URL(`${SITE_BASE}${path}`);
   url.searchParams.set('token', transaction.handoff_token);
   url.searchParams.set('purchaseId', transaction.session_id);

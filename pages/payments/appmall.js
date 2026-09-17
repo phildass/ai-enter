@@ -46,6 +46,19 @@ export async function getServerSideProps({ query }) {
   const offerVal = typeof offer === 'string' ? offer : '';
   const isAstroPack = courseSlug === 'astro-question' || courseSlug === 'janam-kundli';
 
+  if (courseSlug === 'international-course' || offerVal === 'international') {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query || {})) {
+      if (typeof value === 'string' && value) params.set(key, value);
+    }
+    return {
+      redirect: {
+        destination: `/payments/foriegn?${params.toString()}`,
+        permanent: false,
+      },
+    };
+  }
+
   if (!token) {
     const amountPaise = resolveAppmallAmountPaise(courseSlug, amount, { offer: offerVal });
     return {
@@ -59,6 +72,23 @@ export async function getServerSideProps({ query }) {
     if (!APPMALL_ALLOWED_COURSES.includes(payload.courseSlug)) {
       console.error('[appmall-payments] Course not in allowed list:', payload.courseSlug);
       return { props: { tokenError: makeTokenVerificationError(`Course "${payload.courseSlug}" is not available.`) } };
+    }
+
+    if (
+      payload.courseSlug === 'international-course' ||
+      offerVal === 'international' ||
+      payload.offer === 'international'
+    ) {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query || {})) {
+        if (typeof value === 'string' && value) params.set(key, value);
+      }
+      return {
+        redirect: {
+          destination: `/payments/foriegn?${params.toString()}`,
+          permanent: false,
+        },
+      };
     }
 
     const amountPaise = resolveAppmallAmountPaise(

@@ -271,6 +271,55 @@ function buildJwt(payload, secret) {
   console.log('✓ festival amount: 11600 paise is distinct from 59000');
 })();
 
+(function testInternationalAmounts() {
+  const fs = require('fs');
+  const path = require('path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'courses.js'), 'utf8');
+
+  const INR_PAISE = 20000;
+  const USD_CENTS = 300;
+  assert.strictEqual(Math.round(200 * 100), INR_PAISE);
+  assert.strictEqual(Math.round(3 * 100), USD_CENTS);
+  assert.notStrictEqual(INR_PAISE, 11600, 'International Rs 200 must not collide with festival Rs 116');
+  assert.notStrictEqual(INR_PAISE, 59000, 'International Rs 200 must not collide with standard Rs 590');
+  assert.ok(
+    /INTERNATIONAL_AMOUNT_PAISE\s*=\s*20000/.test(src),
+    'courses.js must define international INR as 20000 paise',
+  );
+  assert.ok(
+    /INTERNATIONAL_AMOUNT_CENTS\s*=\s*300/.test(src),
+    'courses.js must define international USD as 300 cents',
+  );
+  assert.ok(
+    /INTERNATIONAL_COURSE_ID\s*=\s*'international-course'/.test(src),
+    'courses.js must define international-course id',
+  );
+  assert.ok(
+    /isAllowedInternationalCharge/.test(src),
+    'courses.js must allowlist international charges separately from festival/standard',
+  );
+  assert.ok(
+    !/n === INTERNATIONAL_AMOUNT_PAISE/.test(src.split('function isAllowedAppmallAmountPaise')[1].split('function isInternationalPaymentCourse')[0]),
+    'isAllowedAppmallAmountPaise must not accept 20000 (foriegn path only)',
+  );
+
+  const page = fs.readFileSync(path.join(__dirname, '..', 'pages', 'payments', 'foriegn.js'), 'utf8');
+  assert.ok(page.includes('International buyers'), 'foriegn page must describe international buyers');
+  assert.ok(page.includes('INTERNATIONAL_COURSE_ID'), 'foriegn page must charge international-course');
+
+  const redirectPage = fs.readFileSync(path.join(__dirname, '..', 'pages', 'payments', 'foreign.js'), 'utf8');
+  assert.ok(redirectPage.includes('/payments/foriegn'), 'foreign spelling must redirect to foriegn');
+
+  const createOrder = fs.readFileSync(
+    path.join(__dirname, '..', 'pages', 'api', 'payments', 'create-order.js'),
+    'utf8',
+  );
+  assert.ok(createOrder.includes('isAllowedInternationalCharge'), 'create-order must allowlist international amounts');
+  assert.ok(createOrder.includes("currency = signedCurrency"), 'create-order must pass JWT currency including USD');
+
+  console.log('✓ international amount: 20000 paise INR and 300 cents USD');
+})();
+
 // ---------------------------------------------------------------------------
 // All tests passed
 // ---------------------------------------------------------------------------

@@ -1,3 +1,9 @@
+## [2026-09-17] — International buyers Rs 200 / USD 3 (`/payments/foriegn`)
+
+New signed checkout page **`/payments/foriegn`** (owner spelling). International SKU is **20000 paise INR** or **300 cents USD** from the JWT (`amount_paise` / `amount_cents` + `currency`). Those amounts are allowlisted on this path only so Razorpay cannot fall back to Rs 590 / Rs 116. Copy is a single International buyers option (Rs 200 or USD 3), not a multi-product chooser. `create-order` passes USD when the signed token says USD (Razorpay international settlement must be enabled on the account; if the account is INR-only, Razorpay will reject USD orders). `/payments/foreign` redirects to `/payments/foriegn`.
+
+---
+
 ## [2026-09-17] — Festival Rs 116 (through 30 Sep); IG discounted page retired
 
 Appmall suite on `/payments/appmall` now accepts **11600 paise** from the signed JWT / `amount=116` query (festival through 30 Sep 2026 IST). Display copy is festival Rs 116 including Manual + App Builder. From 1 Oct: Rs 500 + 18% GST (Rs 590) for every app. Create-order prefers the signed JWT amount over the page body (and will not reuse a pending Razorpay order at a different amount), so Razorpay cannot silently stay at Rs 590. `/payments/discounted` redirects to https://appmall.in/pay.
