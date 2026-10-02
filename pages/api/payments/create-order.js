@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       currency = 'USD';
     } else {
     // Prefer signed JWT amount over req.body so Razorpay cannot stay at Rs 590
-    // when the token is festival 11600 paise (the page body used to win).
+    // when the token is suite 12050 paise (the page body used to win).
     const signedPaise = Number(payload.amount_paise || payload.amountPaise || 0);
     amount_paise = isAllowedAppmallAmountPaise(signedPaise)
       ? signedPaise

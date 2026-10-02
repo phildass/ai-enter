@@ -45,8 +45,8 @@ function buildJwt(payload, secret) {
 (function testSignatureExactness() {
   const secret = 'test-signing-secret';
 
-  // Festival suite amount is 11600 paise; post-1 Oct standard is 59000.
-  const DEFAULT_AMOUNT_PAISE = 11600;
+  // Live limited-period suite amount is 12050 paise.
+  const DEFAULT_AMOUNT_PAISE = 12050;
 
   const payload = {
     purchaseId: 'purchase-123',
@@ -99,8 +99,8 @@ function buildJwt(payload, secret) {
     'event',
   ];
 
-  // Festival suite amount is 11600 paise; post-1 Oct standard is 59000.
-  const DEFAULT_AMOUNT_PAISE = 11600;
+  // Live limited-period suite amount is 12050 paise.
+  const DEFAULT_AMOUNT_PAISE = 12050;
 
   const confirmPayload = {
     purchaseId: 'purchase-123',
@@ -234,41 +234,35 @@ function buildJwt(payload, secret) {
   console.log('✓ x-aienter-timestamp: value is Unix epoch seconds');
 })();
 
-(function testFestivalAmountPaise() {
+(function testLimitedMembershipAmountPaise() {
   const fs = require('fs');
   const path = require('path');
   const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'courses.js'), 'utf8');
 
-  const FESTIVAL_AMOUNT_PAISE = 11600;
-  const STANDARD_AMOUNT_PAISE = 59000;
-  assert.notStrictEqual(
-    FESTIVAL_AMOUNT_PAISE,
-    STANDARD_AMOUNT_PAISE,
-    'Festival Rs 116 must not collide with standard Rs 590',
-  );
-  assert.strictEqual(Math.round(116 * 100), FESTIVAL_AMOUNT_PAISE);
+  const LIVE_AMOUNT_PAISE = 12050;
+  const HISTORICAL_FESTIVAL_PAISE = 11600;
+  const HISTORICAL_STANDARD_PAISE = 59000;
+  assert.strictEqual(Math.round(120.5 * 100), LIVE_AMOUNT_PAISE);
   assert.ok(
-    /FESTIVAL_MEMBERSHIP_AMOUNT_PAISE\s*=\s*11600/.test(src),
-    'courses.js must define festival amount as 11600 paise',
+    /MEMBERSHIP_AMOUNT_PAISE\s*=\s*12050/.test(src),
+    'courses.js must define live membership as 12050 paise',
   );
   assert.ok(
-    /APPMALL_STANDARD_AMOUNT_PAISE\s*=\s*59000/.test(src),
-    'courses.js must define standard amount as 59000 paise',
+    /APPMALL_HISTORICAL_FESTIVAL_AMOUNT_PAISE\s*=\s*11600/.test(src),
+    'courses.js must keep historical 11600 for prior orders',
   );
   assert.ok(
-    /n === FESTIVAL_MEMBERSHIP_AMOUNT_PAISE/.test(src),
-    'isAllowedAppmallAmountPaise must include 11600',
+    /APPMALL_HISTORICAL_STANDARD_AMOUNT_PAISE\s*=\s*59000/.test(src),
+    'courses.js must keep historical 59000 for prior orders',
   );
+  assert.ok(
+    /n === MEMBERSHIP_AMOUNT_PAISE/.test(src),
+    'isAllowedAppmallAmountPaise must include 12050',
+  );
+  assert.notStrictEqual(LIVE_AMOUNT_PAISE, HISTORICAL_FESTIVAL_PAISE);
+  assert.notStrictEqual(LIVE_AMOUNT_PAISE, HISTORICAL_STANDARD_PAISE);
 
-  const endsAt = Date.parse('2026-09-30T18:29:59.999Z');
-  const after = Date.parse('2026-09-30T18:30:00.000Z');
-  assert.ok(endsAt < after, 'festival cutoff must precede 1 Oct 2026 IST');
-  assert.ok(
-    /2026-09-30T18:29:59\.999Z/.test(src),
-    'festival offer must end 30 Sep 2026 23:59 IST',
-  );
-
-  console.log('✓ festival amount: 11600 paise is distinct from 59000');
+  console.log('✓ limited membership amount: 12050 paise (historical 11600/59000 allowlisted)');
 })();
 
 (function testInternationalAmounts() {
@@ -278,8 +272,9 @@ function buildJwt(payload, secret) {
 
   const USD_CENTS = 500;
   assert.strictEqual(Math.round(5 * 100), USD_CENTS);
-  assert.notStrictEqual(USD_CENTS, 11600, 'International USD 5 must not collide with festival Rs 116');
-  assert.notStrictEqual(USD_CENTS, 59000, 'International USD 5 must not collide with standard Rs 590');
+  assert.notStrictEqual(USD_CENTS, 12050, 'International USD 5 must not collide with limited Rs 120.50');
+  assert.notStrictEqual(USD_CENTS, 11600, 'International USD 5 must not collide with historical festival Rs 116');
+  assert.notStrictEqual(USD_CENTS, 59000, 'International USD 5 must not collide with historical standard Rs 590');
   assert.ok(
     /INTERNATIONAL_AMOUNT_CENTS\s*=\s*500/.test(src),
     'courses.js must define international USD as 500 cents',

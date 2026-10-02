@@ -1,3 +1,11 @@
+## [2026-10-02] — AppMall suite Rs 120.50 limited period (12050 paise); no Rs 612.50 / Rs 590 live
+
+**AppMall only** (`/payments/appmall`): live default **12050 paise** (Rs 120.50). Festival branding and post-festival Rs 590 / Rs 612.50 removed from live default. Historical 11600 / 59000 / 61250 remain allowlisted for prior paid orders.
+
+**Glocalwire** (`/payments/glocalwire`): separate product — press release / Media Jobs amounts from glocalwire.com handoff (e.g. Rs 590 per release). Do **not** apply AppMall 12050 here. Page is still to be built/kept independent of `MEMBERSHIP_AMOUNT_PAISE`.
+
+---
+
 ## [2026-09-17] — International buyers USD 5 all-inclusive (`/payments/foriegn`)
 
 New signed checkout page **`/payments/foriegn`** (owner spelling). International SKU is **USD 5 all-inclusive (500 cents)** from the JWT (`amount_cents` / `amount_paise` + `currency=USD`). That amount is allowlisted on this path only so Razorpay cannot fall back to Rs 590 / Rs 116 / INR 200. Copy is a single International buyers option at $5.00 all-inclusive. `create-order` forces USD (Razorpay international settlement must be enabled on the account; if the account is INR-only, Razorpay will reject USD orders). `/payments/foreign` redirects to `/payments/foriegn`.
