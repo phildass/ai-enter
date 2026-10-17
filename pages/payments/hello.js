@@ -188,11 +188,12 @@ export default function HelloPaymentsPage({
         validityLabel="Unlimited in-app messages for the pass period"
         features={[
           'Unlimited in-app messaging while the pass is active',
+          'First Hello payment also grants App Mall suite membership',
+          'Price includes 18% GST + 2% service fee',
           'External phones, emails and social links stay blocked',
-          'Does not grant App Mall suite membership',
-          'Women message free — this pass is for male / other profiles',
+          'Women who are App Mall Reg Users message free — this pass is for male / other profiles',
         ]}
-        limitedTimeNotice="Pay on aienter.in — Hello messaging only. Not a suite registration."
+        limitedTimeNotice="Hello checkout — messaging pass + App Mall membership on first payment. Amount includes 18% GST + 2% service fee."
         originDomain="hello.appmall.in"
         description={`Hello messaging — ${plan.label}`}
         tokenKind="appmall"
