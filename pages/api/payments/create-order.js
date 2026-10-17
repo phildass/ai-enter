@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { verifyHandoffToken } from '../../../lib/verifyHandoffToken';
 import { verifyAppmallToken } from '../../../lib/verifyAppmallToken';
-import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, isAllowedAppmallAmountPaise, isAllowedInternationalCharge, isInternationalPaymentCourse, resolveAppmallAmountPaise } from '../../../lib/courses';
+import { APPMALL_ALLOWED_COURSES, getAppmallDefaultAmountPaise, getHelloPassPlan, isAllowedAppmallAmountPaise, isAllowedInternationalCharge, isHelloPassCourse, isInternationalPaymentCourse, resolveAppmallAmountPaise } from '../../../lib/courses';
 import { resolveAppmallCourseSlug } from '../../../lib/appmallOffer';
 import { getRazorpayCredentialsForApp, isSupportedPaymentApp } from '../../../lib/payments';
 import { extractCustomerPhone, formatRazorpayError } from '../../../lib/razorpayPaymentLink';
@@ -82,13 +82,27 @@ export default async function handler(req, res) {
     } else {
     // Prefer signed JWT amount over req.body so Razorpay cannot stay at Rs 590
     // when the token is suite 12050 paise (the page body used to win).
+    // Hello: allow switching among the 4 plan options on /payments/hello when
+    // the token is already a hello-pass-* and the body selects another valid plan.
     const signedPaise = Number(payload.amount_paise || payload.amountPaise || 0);
-    amount_paise = isAllowedAppmallAmountPaise(signedPaise)
-      ? signedPaise
-      : resolveAppmallAmountPaise(course, payload.amount_incl_gst, {
-          offer: payload.offer,
-          amountPaise: signedPaise,
-        });
+    const tokenCourse = resolveAppmallCourseSlug(payload.courseSlug);
+    const bodyHelloPlan = isHelloPassCourse(course) ? getHelloPassPlan(course) : null;
+    const bodyPaise = Number(req.body.amount_paise || 0);
+    if (
+      isHelloPassCourse(tokenCourse) &&
+      bodyHelloPlan &&
+      bodyPaise === bodyHelloPlan.amountPaise
+    ) {
+      amount_paise = bodyHelloPlan.amountPaise;
+      course = bodyHelloPlan.id;
+    } else {
+      amount_paise = isAllowedAppmallAmountPaise(signedPaise)
+        ? signedPaise
+        : resolveAppmallAmountPaise(course, payload.amount_incl_gst, {
+            offer: payload.offer,
+            amountPaise: signedPaise,
+          });
+    }
     currency = payload.currency || 'INR';
     }
     validity_days =

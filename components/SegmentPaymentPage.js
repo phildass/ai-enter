@@ -141,6 +141,10 @@ const COURSE_LABELS = {
   'lm': 'App-Mall Membership — All Apps',
   'astro-question': 'Astro AI Astrologer — 1 Question',
   'janam-kundli': 'Janam Kundli — Detailed Report',
+  'hello-pass-1d': 'Hello — 1 day unlimited messages (₹100)',
+  'hello-pass-15d': 'Hello — 15 days unlimited messages (₹1,000)',
+  'hello-pass-30d': 'Hello — 1 month unlimited messages (₹1,500)',
+  'hello-pass-365d': 'Hello — 1 year unlimited messages (₹5,000)',
 };
 
 const PHONE_RE = /^\d{10}$/;
